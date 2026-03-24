@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: community-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/community_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: ${COMMUNITY_DB_PASSWORD}
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    timeout: 3000
+  jackson:
+    time-zone: GMT+8
+    date-format: yyyy-MM-dd HH:mm:ss
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.community.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${COMMUNITY_JWT_SECRET}
+  expiration: 86400000
+
+sms:
+  access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID}
+  access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET}
+  region: ap-southeast-1
+  endpoint: dypnsapi.aliyuncs.com
+  scheme-name: 测试方案
+  default-country-code: "86"
+  default-phone-number: "15138114047"
+  sign-name: ${SMS_SIGN_NAME:速通互联验证码}
+  template-code: ${SMS_TEMPLATE_CODE:100001}
+  template-param: '{"code":"##code##","min":"5"}'
+  sms-up-extend-code: ""
+  code-length: 6
+  valid-time: 300
+  duplicate-policy: 1
+  interval-seconds: 60
+  code-type: 1
+  return-verify-code: false
+  case-auth-policy: 1
+
+logging:
+  level:
+    com.community.mapper: debug
+
+shiro:
+  enabled: false
+  annotations:
+    enabled: false
+  web:
+    enabled: false
