@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.SysUserMapper">
+
+    <resultMap id="UserResultMap" type="com.community.entity.SysUser">
+        <id property="id" column="id"/>
+        <result property="username" column="username"/>
+        <result property="password" column="password"/>
+        <result property="phone" column="phone"/>
+        <result property="nickname" column="nickname"/>
+        <result property="role" column="role"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.SysUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO sys_user (username, password, phone, nickname, role, status)
+        VALUES (#{username}, #{password}, #{phone}, #{nickname}, #{role}, #{status})
+    </insert>
+
+    <update id="update" parameterType="com.community.entity.SysUser">
+        UPDATE sys_user
+        SET username = #{username},
+            password = #{password},
+            phone = #{phone},
+            nickname = #{nickname},
+            role = #{role},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM sys_user WHERE id = #{id}
+    </delete>
+
+    <select id="selectById" resultMap="UserResultMap">
+        SELECT id, username, password, phone, nickname, role, status, created_at, updated_at
+        FROM sys_user
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUsername" resultMap="UserResultMap">
+        SELECT id, username, password, phone, nickname, role, status, created_at, updated_at
+        FROM sys_user
+        WHERE username = #{username}
+    </select>
+
+    <select id="selectByPhone" resultMap="UserResultMap">
+        SELECT id, username, password, phone, nickname, role, status, created_at, updated_at
+        FROM sys_user
+        WHERE phone = #{phone}
+        ORDER BY id ASC
+        LIMIT 1
+    </select>
+
+    <select id="selectAll" resultMap="UserResultMap">
+        SELECT id, username, password, phone, nickname, role, status, created_at, updated_at
+        FROM sys_user
+        ORDER BY id DESC
+    </select>
+</mapper>

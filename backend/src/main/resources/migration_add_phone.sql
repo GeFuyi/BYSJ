@@ -1,0 +1,6 @@
+ALTER TABLE sys_user
+    ADD COLUMN phone VARCHAR(20) NOT NULL DEFAULT '15138114047' AFTER password;
+
+UPDATE sys_user
+SET phone = '15138114047'
+WHERE phone IS NULL OR phone = '';

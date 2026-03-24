@@ -1,0 +1,52 @@
+# =========================
+# OS / File Explorer
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# IDE / Editor
+# =========================
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# =========================
+# Logs
+# =========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Backend (Spring Boot / Maven)
+# =========================
+backend/target/
+backend/*.out.log
+backend/*.err.log
+backend/*.out
+backend/*.err
+
+# =========================
+# Frontend (Vue / Vite / npm)
+# =========================
+frontend/node_modules/
+frontend/dist/
+frontend/.npm-cache/
+frontend/.vite/
+frontend/coverage/
+
+# =========================
+# Build artifacts (general)
+# =========================
+*.class
+*.jar
+*.war
+
+# Note:
+# As requested, application.yml and .env are NOT ignored.
