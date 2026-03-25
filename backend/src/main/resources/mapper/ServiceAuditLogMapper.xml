@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ServiceAuditLogMapper">
+
+    <resultMap id="ServiceAuditLogResultMap" type="com.community.entity.ServiceAuditLog">
+        <id property="id" column="id"/>
+        <result property="serviceId" column="service_id"/>
+        <result property="fromAuditStatus" column="from_audit_status"/>
+        <result property="toAuditStatus" column="to_audit_status"/>
+        <result property="action" column="action"/>
+        <result property="reason" column="reason"/>
+        <result property="reviewerId" column="reviewer_id"/>
+        <result property="reviewerName" column="reviewer_name"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.ServiceAuditLog" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO service_audit_log (
+            service_id, from_audit_status, to_audit_status, action, reason, reviewer_id, reviewer_name
+        ) VALUES (
+            #{serviceId}, #{fromAuditStatus}, #{toAuditStatus}, #{action}, #{reason}, #{reviewerId}, #{reviewerName}
+        )
+    </insert>
+
+    <select id="selectByServiceId" resultMap="ServiceAuditLogResultMap">
+        SELECT id, service_id, from_audit_status, to_audit_status, action, reason, reviewer_id, reviewer_name, created_at
+        FROM service_audit_log
+        WHERE service_id = #{serviceId}
+        ORDER BY id DESC
+    </select>
+
+</mapper>
+

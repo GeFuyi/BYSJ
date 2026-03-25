@@ -5,6 +5,9 @@ import Home from "../views/Home.vue";
 import Dashboard from "../views/Dashboard.vue";
 import UserManagement from "../views/UserManagement.vue";
 import RepairOrder from "../views/RepairOrder.vue";
+import ServiceMarket from "../views/ServiceMarket.vue";
+import ServiceProvider from "../views/ServiceProvider.vue";
+import ServiceAudit from "../views/ServiceAudit.vue";
 
 const routes = [
   {
@@ -27,6 +30,18 @@ const routes = [
       {
         path: "dashboard",
         component: Dashboard
+      },
+      {
+        path: "services",
+        component: ServiceMarket
+      },
+      {
+        path: "service-provider",
+        component: ServiceProvider
+      },
+      {
+        path: "service-audit",
+        component: ServiceAudit
       },
       {
         path: "repair",
@@ -67,6 +82,14 @@ router.beforeEach((to, from, next) => {
   }
   if (to.path === "/home/users" && !(role === "ADMIN" || role === "EMPLOYEE")) {
     next("/home/dashboard");
+    return;
+  }
+  if (to.path === "/home/service-provider" && !(role === "ADMIN" || role === "EMPLOYEE")) {
+    next("/home/services");
+    return;
+  }
+  if (to.path === "/home/service-audit" && role !== "ADMIN") {
+    next("/home/services");
     return;
   }
   next();

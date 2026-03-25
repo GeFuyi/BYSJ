@@ -56,6 +56,10 @@ repair:
   upload-dir: uploads/repair
   max-file-size-mb: 10
 
+service-platform:
+  upload-dir: uploads/service
+  max-file-size-mb: 10
+
 logging:
   level:
     com.community.mapper: debug

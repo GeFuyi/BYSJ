@@ -12,6 +12,9 @@
         active-text-color="#ffffff"
       >
         <el-menu-item index="/home/dashboard">首页</el-menu-item>
+        <el-menu-item index="/home/services">便民服务</el-menu-item>
+        <el-menu-item v-if="canProvideService" index="/home/service-provider">服务入驻</el-menu-item>
+        <el-menu-item v-if="isAdmin" index="/home/service-audit">入驻审核</el-menu-item>
         <el-menu-item index="/home/repair">物业报修</el-menu-item>
         <el-menu-item v-if="canManageUsers" index="/home/users">人员管理</el-menu-item>
       </el-menu>
@@ -46,10 +49,15 @@ const local = sessionStorage.getItem("userInfo");
 const userInfo = reactive(local ? JSON.parse(local) : {});
 
 const canManageUsers = computed(() => userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE");
+const canProvideService = computed(() => userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE");
+const isAdmin = computed(() => userInfo.role === "ADMIN");
 
 const pageTitle = computed(() => {
   if (route.path === "/home/users") return "人员管理";
   if (route.path === "/home/repair") return "物业报修";
+  if (route.path === "/home/services") return "便民服务";
+  if (route.path === "/home/service-provider") return "服务入驻";
+  if (route.path === "/home/service-audit") return "入驻审核";
   return "首页";
 });
 

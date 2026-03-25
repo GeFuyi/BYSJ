@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ServiceImageMapper">
+
+    <resultMap id="ServiceImageResultMap" type="com.community.entity.ServiceImage">
+        <id property="id" column="id"/>
+        <result property="serviceId" column="service_id"/>
+        <result property="imagePath" column="image_path"/>
+        <result property="sortNo" column="sort_no"/>
+    </resultMap>
+
+    <delete id="deleteByServiceId">
+        DELETE FROM service_image WHERE service_id = #{serviceId}
+    </delete>
+
+    <insert id="insertBatch">
+        INSERT INTO service_image (service_id, image_path, sort_no)
+        VALUES
+        <foreach collection="imagePaths" item="path" index="idx" separator=",">
+            (#{serviceId}, #{path}, #{idx})
+        </foreach>
+    </insert>
+
+    <select id="selectByServiceId" resultMap="ServiceImageResultMap">
+        SELECT id, service_id, image_path, sort_no
+        FROM service_image
+        WHERE service_id = #{serviceId}
+        ORDER BY sort_no ASC, id ASC
+    </select>
+
+</mapper>
+

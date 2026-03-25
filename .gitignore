@@ -31,6 +31,7 @@ backend/*.out.log
 backend/*.err.log
 backend/*.out
 backend/*.err
+/target/
 
 # =========================
 # Frontend (Vue / Vite / npm)
@@ -40,6 +41,16 @@ frontend/dist/
 frontend/.npm-cache/
 frontend/.vite/
 frontend/coverage/
+/node_modules/
+/dist/
+
+# =========================
+# Runtime uploads / temp data
+# =========================
+backend/uploads/
+/uploads/
+backend/temp/
+/temp/
 
 # =========================
 # Build artifacts (general)

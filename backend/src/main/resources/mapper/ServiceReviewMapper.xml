@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ServiceReviewMapper">
+
+    <resultMap id="ServiceReviewResultMap" type="com.community.entity.ServiceReview">
+        <id property="id" column="id"/>
+        <result property="serviceId" column="service_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="rating" column="rating"/>
+        <result property="content" column="content"/>
+        <result property="reviewerName" column="reviewer_name"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.ServiceReview" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO service_review (service_id, user_id, rating, content, reviewer_name)
+        VALUES (#{serviceId}, #{userId}, #{rating}, #{content}, #{reviewerName})
+    </insert>
+
+    <select id="selectByServiceAndUser" resultMap="ServiceReviewResultMap">
+        SELECT id, service_id, user_id, rating, content, reviewer_name, created_at
+        FROM service_review
+        WHERE service_id = #{serviceId}
+          AND user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="selectByServiceId" resultMap="ServiceReviewResultMap">
+        SELECT id, service_id, user_id, rating, content, reviewer_name, created_at
+        FROM service_review
+        WHERE service_id = #{serviceId}
+        ORDER BY id DESC
+    </select>
+
+</mapper>
+
