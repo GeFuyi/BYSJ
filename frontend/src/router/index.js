@@ -4,6 +4,7 @@ import Register from "../views/Register.vue";
 import Home from "../views/Home.vue";
 import Dashboard from "../views/Dashboard.vue";
 import UserManagement from "../views/UserManagement.vue";
+import RepairOrder from "../views/RepairOrder.vue";
 
 const routes = [
   {
@@ -26,6 +27,10 @@ const routes = [
       {
         path: "dashboard",
         component: Dashboard
+      },
+      {
+        path: "repair",
+        component: RepairOrder
       },
       {
         path: "users",

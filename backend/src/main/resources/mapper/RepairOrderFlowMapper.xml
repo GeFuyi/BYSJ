@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.RepairOrderFlowMapper">
+
+    <resultMap id="RepairOrderFlowResultMap" type="com.community.entity.RepairOrderFlow">
+        <id property="id" column="id"/>
+        <result property="orderId" column="order_id"/>
+        <result property="fromStatus" column="from_status"/>
+        <result property="toStatus" column="to_status"/>
+        <result property="remark" column="remark"/>
+        <result property="operatorId" column="operator_id"/>
+        <result property="operatorName" column="operator_name"/>
+        <result property="operatorRole" column="operator_role"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.RepairOrderFlow" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO repair_order_flow (order_id, from_status, to_status, remark, operator_id, operator_name, operator_role)
+        VALUES (#{orderId}, #{fromStatus}, #{toStatus}, #{remark}, #{operatorId}, #{operatorName}, #{operatorRole})
+    </insert>
+
+    <select id="selectByOrderId" resultMap="RepairOrderFlowResultMap">
+        SELECT id, order_id, from_status, to_status, remark, operator_id, operator_name, operator_role, created_at
+        FROM repair_order_flow
+        WHERE order_id = #{orderId}
+        ORDER BY id ASC
+    </select>
+
+</mapper>
+

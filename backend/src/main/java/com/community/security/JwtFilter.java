@@ -19,7 +19,7 @@ public class JwtFilter extends AuthenticatingFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private static final List<String> WHITELIST_PREFIX = Arrays.asList("/api/auth/");
-    private static final List<String> WHITELIST_PATH = Arrays.asList("/api/health", "/error");
+    private static final List<String> WHITELIST_PATH = Arrays.asList("/api/health", "/error", "/api/repair/file");
 
     @Override
     protected AuthenticationToken createToken(ServletRequest request, ServletResponse response) {

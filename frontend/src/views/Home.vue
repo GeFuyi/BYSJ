@@ -12,14 +12,16 @@
         active-text-color="#ffffff"
       >
         <el-menu-item index="/home/dashboard">首页</el-menu-item>
+        <el-menu-item index="/home/repair">物业报修</el-menu-item>
         <el-menu-item v-if="canManageUsers" index="/home/users">人员管理</el-menu-item>
       </el-menu>
     </el-aside>
+
     <el-container>
       <el-header
         style="display: flex; justify-content: space-between; align-items: center; background: #fff; border-bottom: 1px solid #edf1f6"
       >
-        <div style="font-weight: 600">首页</div>
+        <div style="font-weight: 600">{{ pageTitle }}</div>
         <div style="display: flex; align-items: center; gap: 12px">
           <el-tag>{{ userInfo.role || "-" }}</el-tag>
           <span>{{ userInfo.nickname || userInfo.username || "-" }}</span>
@@ -35,13 +37,21 @@
 
 <script setup>
 import { computed, reactive } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
+const route = useRoute();
 const router = useRouter();
+
 const local = sessionStorage.getItem("userInfo");
 const userInfo = reactive(local ? JSON.parse(local) : {});
 
 const canManageUsers = computed(() => userInfo.role === "ADMIN" || userInfo.role === "EMPLOYEE");
+
+const pageTitle = computed(() => {
+  if (route.path === "/home/users") return "人员管理";
+  if (route.path === "/home/repair") return "物业报修";
+  return "首页";
+});
 
 function logout() {
   sessionStorage.removeItem("token");

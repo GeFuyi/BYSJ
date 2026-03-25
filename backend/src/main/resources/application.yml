@@ -4,11 +4,15 @@ server:
 spring:
   application:
     name: community-backend
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/community_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
     username: root
-    password: ${COMMUNITY_DB_PASSWORD}
+    password: ${COMMUNITY_DB_PASSWORD:123456}
   redis:
     host: 127.0.0.1
     port: 6379
@@ -25,19 +29,19 @@ mybatis:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: ${COMMUNITY_JWT_SECRET}
+  secret: ${COMMUNITY_JWT_SECRET:community-service-jwt-secret-key-2026-0123456789}
   expiration: 86400000
 
 sms:
-  access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID}
-  access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET}
+  access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID:}
+  access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
   region: ap-southeast-1
   endpoint: dypnsapi.aliyuncs.com
-  scheme-name: 测试方案
+  scheme-name: ${SMS_SCHEME_NAME:TestScheme}
   default-country-code: "86"
   default-phone-number: "15138114047"
-  sign-name: ${SMS_SIGN_NAME:速通互联验证码}
-  template-code: ${SMS_TEMPLATE_CODE:100001}
+  sign-name: ${SMS_SIGN_NAME:}
+  template-code: ${SMS_TEMPLATE_CODE:}
   template-param: '{"code":"##code##","min":"5"}'
   sms-up-extend-code: ""
   code-length: 6
@@ -47,6 +51,10 @@ sms:
   code-type: 1
   return-verify-code: false
   case-auth-policy: 1
+
+repair:
+  upload-dir: uploads/repair
+  max-file-size-mb: 10
 
 logging:
   level:

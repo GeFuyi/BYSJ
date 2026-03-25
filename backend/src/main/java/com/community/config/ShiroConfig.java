@@ -47,6 +47,7 @@ public class ShiroConfig {
         Map<String, String> chainDefinitionMap = new LinkedHashMap<>();
         chainDefinitionMap.put("/api/auth/**", "anon");
         chainDefinitionMap.put("/api/health", "anon");
+        chainDefinitionMap.put("/api/repair/file", "anon");
         chainDefinitionMap.put("/error", "anon");
         chainDefinitionMap.put("/**", "jwt");
         filterFactoryBean.setFilterChainDefinitionMap(chainDefinitionMap);
