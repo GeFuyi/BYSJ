@@ -13,6 +13,7 @@ public class UserResponse {
     private String username;
     private String phone;
     private String nickname;
+    private String avatarPath;
     private String role;
     private Integer status;
 
@@ -28,6 +29,7 @@ public class UserResponse {
         response.setUsername(user.getUsername());
         response.setPhone(user.getPhone());
         response.setNickname(user.getNickname());
+        response.setAvatarPath(user.getAvatarPath());
         response.setRole(user.getRole());
         response.setStatus(user.getStatus());
         response.setCreatedAt(user.getCreatedAt());

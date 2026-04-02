@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ChatGroupMapper">
+
+    <resultMap id="ChatGroupResultMap" type="com.community.entity.ChatGroup">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="ownerId" column="owner_id"/>
+        <result property="announcement" column="announcement"/>
+        <result property="announcementVersion" column="announcement_version"/>
+        <result property="announcementUpdatedAt" column="announcement_updated_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.ChatGroup" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_group (name, owner_id, announcement, announcement_version, announcement_updated_at)
+        VALUES (#{name}, #{ownerId}, #{announcement}, #{announcementVersion}, #{announcementUpdatedAt})
+    </insert>
+
+    <select id="selectById" resultMap="ChatGroupResultMap">
+        SELECT id, name, owner_id, announcement, announcement_version, announcement_updated_at, created_at, updated_at
+        FROM chat_group
+        WHERE id = #{id}
+    </select>
+
+    <update id="updateOwner">
+        UPDATE chat_group
+        SET owner_id = #{ownerId}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateAnnouncement">
+        UPDATE chat_group
+        SET announcement = #{announcement},
+            announcement_version = #{announcementVersion},
+            announcement_updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM chat_group WHERE id = #{id}
+    </delete>
+
+</mapper>

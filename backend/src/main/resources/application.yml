@@ -60,6 +60,33 @@ service-platform:
   upload-dir: uploads/service
   max-file-size-mb: 10
 
+social:
+  upload-dir: uploads/social
+  max-file-size-mb: 10
+
+alipay:
+  enabled: ${ALIPAY_ENABLED:true}
+  gateway-url: https://openapi.alipay.com/gateway.do
+  app-id: ${ALIPAY_APP_ID:}
+  private-key: ${ALIPAY_PRIVATE_KEY:}
+  alipay-public-key: ${ALIPAY_PUBLIC_KEY:}
+  access-token: ${ALIPAY_ACCESS_TOKEN:}
+  app-auth-token: ${ALIPAY_APP_AUTH_TOKEN:}
+  charset: UTF-8
+  sign-type: RSA2
+  format: json
+  # notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8080/api/electricity/notify}
+  notify-url: ${ALIPAY_NOTIFY_URL:https://veronika-overclean-charla.ngrok-free.dev/api/electricity/notify}
+  default-order-type: JF
+  default-sub-order-type: ELEC
+  default-charge-inst: ${ALIPAY_DEFAULT_CHARGE_INST:国网河南省电力公司（新蔡）}
+  default-province: ${ALIPAY_DEFAULT_PROVINCE:河南}
+  default-city: ${ALIPAY_DEFAULT_CITY:驻马店}
+  default-bill-key: ${ALIPAY_DEFAULT_BILL_KEY:4107880059197}
+  default-owner-name: ${ALIPAY_DEFAULT_OWNER_NAME:社区住户}
+  subject-prefix: ${ALIPAY_SUBJECT_PREFIX:社区电费代缴}
+  timeout-express: ${ALIPAY_TIMEOUT_EXPRESS:15m}
+
 logging:
   level:
     com.community.mapper: debug

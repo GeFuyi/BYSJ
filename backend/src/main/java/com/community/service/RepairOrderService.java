@@ -17,7 +17,7 @@ public interface RepairOrderService {
 
     RepairOrderDetailResponse createOrder(RepairOrderCreateRequest request, SysUser currentUser);
 
-    List<RepairOrderListItemResponse> listOrders(String status, SysUser currentUser);
+    List<RepairOrderListItemResponse> listOrders(String status, Boolean mineOnly, SysUser currentUser);
 
     RepairOrderDetailResponse getOrderDetail(Long id, SysUser currentUser);
 
@@ -25,4 +25,3 @@ public interface RepairOrderService {
 
     Resource loadImageAsResource(String path);
 }
-

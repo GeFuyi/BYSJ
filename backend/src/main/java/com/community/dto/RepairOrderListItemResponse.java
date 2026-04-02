@@ -13,8 +13,10 @@ public class RepairOrderListItemResponse {
     private Long userId;
     private String username;
     private String userNickname;
+    private String userAvatarPath;
     private Long handlerId;
     private String handlerName;
+    private String handlerAvatarPath;
     private String title;
     private String description;
     private String contactPhone;
@@ -28,4 +30,3 @@ public class RepairOrderListItemResponse {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date updatedAt;
 }
-

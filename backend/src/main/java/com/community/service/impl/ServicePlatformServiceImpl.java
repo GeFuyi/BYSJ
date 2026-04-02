@@ -95,15 +95,15 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     @Override
     public ServiceImageUploadResponse uploadImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException("请上传图片");
+            throw new BusinessException("操作失败");
         }
         String contentType = file.getContentType();
         if (!StringUtils.hasText(contentType) || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            throw new BusinessException("仅支持图片类型文件");
+            throw new BusinessException("操作失败");
         }
         long maxBytes = properties.getMaxFileSizeMb() * 1024L * 1024L;
         if (file.getSize() > maxBytes) {
-            throw new BusinessException("图片大小不能超过 " + properties.getMaxFileSizeMb() + "MB");
+            throw new BusinessException("操作失败");
         }
 
         String day = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
@@ -111,7 +111,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         try {
             Files.createDirectories(dir);
         } catch (IOException ex) {
-            throw new BusinessException(500, "创建上传目录失败: " + ex.getMessage());
+            throw new BusinessException(500, "服务器内部错误");
         }
         String suffix = fileSuffix(file.getOriginalFilename());
         String fileName = UUID.randomUUID().toString().replace("-", "") + suffix;
@@ -119,7 +119,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         try {
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
-            throw new BusinessException(500, "图片保存失败: " + ex.getMessage());
+            throw new BusinessException(500, "服务器内部错误");
         }
         String relativePath = day + "/" + fileName;
         ServiceImageUploadResponse response = new ServiceImageUploadResponse();
@@ -183,14 +183,14 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         validateCategory(request.getCategoryCode());
         ConvenienceService existing = serviceMapper.selectById(id);
         if (existing == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         if (!ROLE_ADMIN.equals(currentUser.getRole()) && !existing.getProviderId().equals(currentUser.getId())) {
-            throw new BusinessException(403, "仅服务发布方可修改");
+            throw new BusinessException(403, "无权限访问");
         }
         int maxCapacity = request.getMaxCapacity() == null ? existing.getMaxCapacity() : request.getMaxCapacity();
         if (existing.getCurrentBooked() != null && maxCapacity < existing.getCurrentBooked()) {
-            throw new BusinessException("可预约名额不能小于当前预约人数");
+            throw new BusinessException("操作失败");
         }
 
         existing.setName(request.getName());
@@ -242,10 +242,10 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         requireAdminRole(currentUser);
         ConvenienceService service = serviceMapper.selectById(id);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         if (!ServiceAuditStatus.PENDING.name().equals(service.getAuditStatus())) {
-            throw new BusinessException("仅待审核状态可执行审核");
+            throw new BusinessException("操作失败");
         }
 
         ServiceAuditAction action = ServiceAuditAction.fromCode(request.getAction().trim().toUpperCase(Locale.ROOT));
@@ -257,12 +257,12 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         } else if (action == ServiceAuditAction.REJECT) {
             toAuditStatus = ServiceAuditStatus.REJECTED.name();
             if (!StringUtils.hasText(reason)) {
-                throw new BusinessException("拒绝时请填写原因");
+                throw new BusinessException("操作失败");
             }
         } else {
             toAuditStatus = ServiceAuditStatus.RETURNED.name();
             if (!StringUtils.hasText(reason)) {
-                throw new BusinessException("驳回时请填写原因");
+                throw new BusinessException("操作失败");
             }
         }
 
@@ -287,13 +287,13 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         requireProviderRole(currentUser);
         ConvenienceService service = serviceMapper.selectById(id);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         if (!ROLE_ADMIN.equals(currentUser.getRole()) && !service.getProviderId().equals(currentUser.getId())) {
-            throw new BusinessException(403, "仅服务发布方可修改服务状态");
+            throw new BusinessException(403, "无权限访问");
         }
         if (!ServiceAuditStatus.APPROVED.name().equals(service.getAuditStatus())) {
-            throw new BusinessException("服务未审核通过，不能修改服务状态");
+            throw new BusinessException("操作失败");
         }
 
         String targetStatus = normalizeServiceStatus(request.getServiceStatus());
@@ -301,7 +301,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
                 && service.getCurrentBooked() != null
                 && service.getMaxCapacity() != null
                 && service.getCurrentBooked() >= service.getMaxCapacity()) {
-            throw new BusinessException("当前已约满，请先调整名额或保持约满状态");
+            throw new BusinessException("操作失败");
         }
         serviceMapper.updateOperateStatus(id, targetStatus);
         return buildDetail(serviceMapper.selectById(id), currentUser, true);
@@ -323,11 +323,11 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     public ServiceDetailResponse serviceDetail(Long id, SysUser currentUser) {
         ConvenienceService service = serviceMapper.selectById(id);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         boolean canViewAuditDetails = canViewAudit(service, currentUser);
         if (!ServiceAuditStatus.APPROVED.name().equals(service.getAuditStatus()) && !canViewAuditDetails) {
-            throw new BusinessException(403, "服务未上线，暂无查看权限");
+            throw new BusinessException(403, "无权限访问");
         }
         return buildDetail(service, currentUser, canViewAuditDetails);
     }
@@ -338,17 +338,17 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         requireUserRole(currentUser);
         ConvenienceService service = serviceMapper.selectById(serviceId);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         if (!ServiceAuditStatus.APPROVED.name().equals(service.getAuditStatus())) {
-            throw new BusinessException("服务未上线，无法预约");
+            throw new BusinessException("操作失败");
         }
         if (!ServiceOperateStatus.RESERVABLE.name().equals(service.getServiceStatus())) {
-            throw new BusinessException("当前服务不可预约");
+            throw new BusinessException("操作失败");
         }
         ServiceBooking existing = bookingMapper.selectActiveByServiceAndUser(serviceId, currentUser.getId());
         if (existing != null) {
-            throw new BusinessException("你已预约该服务，请勿重复报名");
+            throw new BusinessException("操作失败");
         }
 
         ServiceBooking booking = new ServiceBooking();
@@ -362,7 +362,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
 
         int affected = serviceMapper.incrementBookedIfAvailable(serviceId);
         if (affected <= 0) {
-            throw new BusinessException("服务已约满，请稍后重试");
+            throw new BusinessException("操作失败");
         }
 
         return toBookingResponse(booking, service);
@@ -386,18 +386,18 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         requireUserRole(currentUser);
         ConvenienceService service = serviceMapper.selectById(serviceId);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         if (!ServiceAuditStatus.APPROVED.name().equals(service.getAuditStatus())) {
-            throw new BusinessException("服务未上线，无法评价");
+            throw new BusinessException("操作失败");
         }
         ServiceBooking booking = bookingMapper.selectActiveByServiceAndUser(serviceId, currentUser.getId());
         if (booking == null) {
-            throw new BusinessException("请先预约服务再评价");
+            throw new BusinessException("操作失败");
         }
         ServiceReview existed = reviewMapper.selectByServiceAndUser(serviceId, currentUser.getId());
         if (existed != null) {
-            throw new BusinessException("你已评价过该服务");
+            throw new BusinessException("操作失败");
         }
 
         ServiceReview review = new ServiceReview();
@@ -415,7 +415,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     public List<ServiceReviewResponse> listReviews(Long serviceId) {
         ConvenienceService service = serviceMapper.selectById(serviceId);
         if (service == null) {
-            throw new BusinessException(404, "服务不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         return reviewMapper.selectByServiceId(serviceId).stream().map(this::toReviewResponse).collect(Collectors.toList());
     }
@@ -423,19 +423,19 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     @Override
     public Resource loadImageAsResource(String path) {
         if (!StringUtils.hasText(path) || path.contains("..")) {
-            throw new BusinessException(400, "非法图片路径");
+            throw new BusinessException(400, "请求参数不合法");
         }
         Path target = getUploadRoot().resolve(path).normalize();
         if (!target.startsWith(getUploadRoot())) {
-            throw new BusinessException(400, "非法图片路径");
+            throw new BusinessException(400, "请求参数不合法");
         }
         if (!Files.exists(target) || !Files.isReadable(target)) {
-            throw new BusinessException(404, "图片不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         try {
             return new UrlResource(target.toUri());
         } catch (MalformedURLException ex) {
-            throw new BusinessException(500, "读取图片失败: " + ex.getMessage());
+            throw new BusinessException(500, "服务器内部错误");
         }
     }
 
@@ -469,6 +469,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         response.setId(service.getId());
         response.setProviderId(service.getProviderId());
         response.setProviderName(provider == null ? "-" : resolveDisplayName(provider));
+        response.setProviderAvatarPath(provider == null ? null : provider.getAvatarPath());
         response.setName(service.getName());
         response.setCategoryCode(service.getCategoryCode());
         response.setCategoryName(category == null ? service.getCategoryCode() : category.getName());
@@ -490,10 +491,13 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private ServiceBookingResponse toBookingResponse(ServiceBooking booking, ConvenienceService service) {
+        SysUser bookingUser = userMapper.selectById(booking.getUserId());
         ServiceBookingResponse response = new ServiceBookingResponse();
         response.setId(booking.getId());
         response.setServiceId(booking.getServiceId());
         response.setUserId(booking.getUserId());
+        response.setUserNickname(bookingUser == null ? "-" : resolveDisplayName(bookingUser));
+        response.setUserAvatarPath(bookingUser == null ? null : bookingUser.getAvatarPath());
         response.setServiceName(service == null ? "-" : service.getName());
         response.setContactName(booking.getContactName());
         response.setContactPhone(booking.getContactPhone());
@@ -505,6 +509,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private ServiceReviewResponse toReviewResponse(ServiceReview review) {
+        SysUser reviewUser = userMapper.selectById(review.getUserId());
         ServiceReviewResponse response = new ServiceReviewResponse();
         response.setId(review.getId());
         response.setServiceId(review.getServiceId());
@@ -512,11 +517,13 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         response.setRating(review.getRating());
         response.setContent(review.getContent());
         response.setReviewerName(review.getReviewerName());
+        response.setReviewerAvatarPath(reviewUser == null ? null : reviewUser.getAvatarPath());
         response.setCreatedAt(review.getCreatedAt());
         return response;
     }
 
     private ServiceAuditLogResponse toAuditLogResponse(ServiceAuditLog log) {
+        SysUser reviewer = log.getReviewerId() == null ? null : userMapper.selectById(log.getReviewerId());
         ServiceAuditLogResponse response = new ServiceAuditLogResponse();
         response.setId(log.getId());
         response.setFromAuditStatus(log.getFromAuditStatus());
@@ -527,6 +534,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         response.setReason(log.getReason());
         response.setReviewerId(log.getReviewerId());
         response.setReviewerName(log.getReviewerName());
+        response.setReviewerAvatarPath(reviewer == null ? null : reviewer.getAvatarPath());
         response.setCreatedAt(log.getCreatedAt());
         return response;
     }
@@ -570,7 +578,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
             throw new BusinessException(401, "请先登录");
         }
         if (!ROLE_ADMIN.equals(user.getRole()) && !ROLE_EMPLOYEE.equals(user.getRole())) {
-            throw new BusinessException(403, "仅员工或管理员可发布服务");
+            throw new BusinessException(403, "无权限访问");
         }
     }
 
@@ -579,7 +587,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
             throw new BusinessException(401, "请先登录");
         }
         if (!ROLE_ADMIN.equals(user.getRole())) {
-            throw new BusinessException(403, "仅管理员可执行审核");
+            throw new BusinessException(403, "无权限访问");
         }
     }
 
@@ -588,17 +596,17 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
             throw new BusinessException(401, "请先登录");
         }
         if (!ROLE_USER.equals(user.getRole()) && !ROLE_ADMIN.equals(user.getRole())) {
-            throw new BusinessException(403, "仅居民用户可预约或评价");
+            throw new BusinessException(403, "无权限访问");
         }
     }
 
     private void validateCategory(String categoryCode) {
         if (!StringUtils.hasText(categoryCode)) {
-            throw new BusinessException("服务分类不能为空");
+            throw new BusinessException("操作失败");
         }
         ServiceCategory category = categoryMapper.selectByCode(categoryCode.trim());
         if (category == null || category.getStatus() == null || category.getStatus() != 1) {
-            throw new BusinessException("服务分类不存在或已禁用: " + categoryCode);
+            throw new BusinessException("操作失败");
         }
     }
 
@@ -655,9 +663,8 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         try {
             Files.createDirectories(root);
         } catch (IOException ex) {
-            throw new BusinessException(500, "创建上传根目录失败: " + ex.getMessage());
+            throw new BusinessException(500, "服务器内部错误");
         }
         return root;
     }
 }
-

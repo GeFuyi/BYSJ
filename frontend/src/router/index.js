@@ -8,6 +8,8 @@ import RepairOrder from "../views/RepairOrder.vue";
 import ServiceMarket from "../views/ServiceMarket.vue";
 import ServiceProvider from "../views/ServiceProvider.vue";
 import ServiceAudit from "../views/ServiceAudit.vue";
+import ElectricityPayment from "../views/ElectricityPayment.vue";
+import SocialHub from "../views/SocialHub.vue";
 
 const routes = [
   {
@@ -46,6 +48,14 @@ const routes = [
       {
         path: "repair",
         component: RepairOrder
+      },
+      {
+        path: "electricity",
+        component: ElectricityPayment
+      },
+      {
+        path: "social",
+        component: SocialHub
       },
       {
         path: "users",
@@ -90,6 +100,10 @@ router.beforeEach((to, from, next) => {
   }
   if (to.path === "/home/service-audit" && role !== "ADMIN") {
     next("/home/services");
+    return;
+  }
+  if (to.path === "/home/electricity" && !(role === "USER" || role === "ADMIN")) {
+    next("/home/dashboard");
     return;
   }
   next();

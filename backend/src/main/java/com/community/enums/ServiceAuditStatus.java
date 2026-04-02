@@ -3,10 +3,10 @@ package com.community.enums;
 import com.community.common.BusinessException;
 
 public enum ServiceAuditStatus {
-    PENDING("待审核"),
-    APPROVED("审核通过"),
-    REJECTED("审核拒绝"),
-    RETURNED("驳回修改");
+    PENDING("\u5f85\u5ba1\u6838"),
+    APPROVED("\u5df2\u901a\u8fc7"),
+    REJECTED("\u5df2\u9a73\u56de"),
+    RETURNED("\u5df2\u9000\u56de");
 
     private final String label;
 
@@ -22,8 +22,7 @@ public enum ServiceAuditStatus {
         try {
             return valueOf(code);
         } catch (Exception ex) {
-            throw new BusinessException("不支持的审核状态: " + code);
+            throw new BusinessException("操作失败");
         }
     }
 }
-

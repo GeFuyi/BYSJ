@@ -2,11 +2,16 @@ package com.community.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 
 import javax.annotation.PostConstruct;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class DatabaseMigrationRunner {
@@ -14,253 +19,128 @@ public class DatabaseMigrationRunner {
     private static final Logger log = LoggerFactory.getLogger(DatabaseMigrationRunner.class);
 
     private final JdbcTemplate jdbcTemplate;
+    private final ResourceLoader resourceLoader;
 
-    public DatabaseMigrationRunner(JdbcTemplate jdbcTemplate) {
+    public DatabaseMigrationRunner(JdbcTemplate jdbcTemplate, ResourceLoader resourceLoader) {
         this.jdbcTemplate = jdbcTemplate;
+        this.resourceLoader = resourceLoader;
     }
 
     @PostConstruct
     public void migrate() {
+        bootstrapSchema();
+        ensureColumns();
+        seedServiceCategories();
+    }
+
+    private void bootstrapSchema() {
+        Resource schema = resourceLoader.getResource("classpath:schema.sql");
         try {
-            jdbcTemplate.execute("ALTER TABLE sys_user ADD COLUMN phone VARCHAR(20) NOT NULL DEFAULT '15138114047' AFTER password");
-            log.info("database migration success: added column sys_user.phone");
+            String sql = StreamUtils.copyToString(schema.getInputStream(), StandardCharsets.UTF_8);
+            for (String statement : sql.split(";")) {
+                String trimmed = statement.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                jdbcTemplate.execute(trimmed);
+            }
+            log.info("database migration success: schema bootstrap done");
+        } catch (IOException ex) {
+            log.error("database migration failed: cannot read schema.sql", ex);
+            throw new IllegalStateException("cannot read schema.sql", ex);
+        } catch (DataAccessException ex) {
+            log.error("database migration failed while executing schema.sql: {}", ex.getMessage(), ex);
+            throw ex;
+        }
+    }
+
+    private void ensureColumns() {
+        alterIgnoreDuplicate(
+                "ALTER TABLE sys_user ADD COLUMN phone VARCHAR(20) NOT NULL DEFAULT '15138114047' AFTER password",
+                "database migration success: added sys_user.phone",
+                "database migration skipped: sys_user.phone already exists"
+        );
+
+        executeIgnoreError(
+                "UPDATE sys_user SET phone = '15138114047' WHERE phone IS NULL OR phone = ''",
+                "database migration success: default phone filled",
+                "database migration warning (fill default phone): {}"
+        );
+
+        alterIgnoreDuplicate(
+                "ALTER TABLE sys_user ADD COLUMN avatar_path VARCHAR(255) DEFAULT NULL AFTER nickname",
+                "database migration success: added sys_user.avatar_path",
+                "database migration skipped: sys_user.avatar_path already exists"
+        );
+
+        alterIgnoreDuplicate(
+                "ALTER TABLE chat_group_member ADD COLUMN muted TINYINT NOT NULL DEFAULT 0 AFTER role",
+                "database migration success: added chat_group_member.muted",
+                "database migration skipped: chat_group_member.muted already exists"
+        );
+
+        alterIgnoreDuplicate(
+                "ALTER TABLE chat_group ADD COLUMN announcement VARCHAR(500) DEFAULT NULL AFTER owner_id",
+                "database migration success: added chat_group.announcement",
+                "database migration skipped: chat_group.announcement already exists"
+        );
+
+        alterIgnoreDuplicate(
+                "ALTER TABLE chat_group ADD COLUMN announcement_version BIGINT NOT NULL DEFAULT 0 AFTER announcement",
+                "database migration success: added chat_group.announcement_version",
+                "database migration skipped: chat_group.announcement_version already exists"
+        );
+
+        alterIgnoreDuplicate(
+                "ALTER TABLE chat_group ADD COLUMN announcement_updated_at DATETIME DEFAULT NULL AFTER announcement_version",
+                "database migration success: added chat_group.announcement_updated_at",
+                "database migration skipped: chat_group.announcement_updated_at already exists"
+        );
+    }
+
+    private void seedServiceCategories() {
+        try {
+            upsertServiceCategory("HOUSEKEEPING", "Housekeeping", 1);
+            upsertServiceCategory("HOME_REPAIR", "Home Repair", 2);
+            upsertServiceCategory("ELDER_CARE", "Elder Care", 3);
+            upsertServiceCategory("CHILD_CARE", "Child Care", 4);
+            upsertServiceCategory("PET_CARE", "Pet Care", 5);
+            upsertServiceCategory("ERRAND", "Errand", 6);
+            upsertServiceCategory("IT_SUPPORT", "IT Support", 7);
+            upsertServiceCategory("COMMUNITY_CLASS", "Community Class", 8);
+        } catch (DataAccessException ex) {
+            log.warn("database migration warning (init service_category data): {}", ex.getMessage());
+        }
+    }
+
+    private void upsertServiceCategory(String code, String name, int sort) {
+        jdbcTemplate.update(
+                "INSERT INTO service_category (code, name, sort, status) VALUES (?, ?, ?, 1) " +
+                        "ON DUPLICATE KEY UPDATE name = VALUES(name), sort = VALUES(sort), status = VALUES(status)",
+                code, name, sort
+        );
+    }
+
+    private void alterIgnoreDuplicate(String sql, String successLog, String duplicateLog) {
+        try {
+            jdbcTemplate.execute(sql);
+            log.info(successLog);
         } catch (DataAccessException ex) {
             String message = ex.getMessage() == null ? "" : ex.getMessage();
             if (message.contains("Duplicate column name")) {
-                log.info("database migration skipped: column sys_user.phone already exists");
+                log.info(duplicateLog);
             } else {
-                log.warn("database migration warning (add phone): {}", message);
+                log.warn("database migration warning: {}", message);
             }
         }
+    }
 
+    private void executeIgnoreError(String sql, String successLog, String warnLogFormat) {
         try {
-            jdbcTemplate.execute("UPDATE sys_user SET phone = '15138114047' WHERE phone IS NULL OR phone = ''");
+            jdbcTemplate.execute(sql);
+            log.info(successLog);
         } catch (DataAccessException ex) {
-            log.warn("database migration warning (fill default phone): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS repair_order (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "user_id BIGINT NOT NULL," +
-                            "handler_id BIGINT DEFAULT NULL," +
-                            "title VARCHAR(100) NOT NULL," +
-                            "description TEXT NOT NULL," +
-                            "contact_phone VARCHAR(20) DEFAULT NULL," +
-                            "status VARCHAR(40) NOT NULL," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
-                            "INDEX idx_repair_order_user_id (user_id)," +
-                            "INDEX idx_repair_order_handler_id (handler_id)," +
-                            "INDEX idx_repair_order_status (status)," +
-                            "CONSTRAINT fk_repair_order_user FOREIGN KEY (user_id) REFERENCES sys_user(id)," +
-                            "CONSTRAINT fk_repair_order_handler FOREIGN KEY (handler_id) REFERENCES sys_user(id)" +
-                            ")"
-            );
-            log.info("database migration success: ensured table repair_order");
-        } catch (DataAccessException ex) {
-            String message = ex.getMessage() == null ? "" : ex.getMessage();
-            if (message.contains("already exists")) {
-                log.info("database migration skipped: table repair_order already exists");
-            } else {
-                log.warn("database migration warning (repair_order): {}", message);
-            }
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS repair_order_image (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "order_id BIGINT NOT NULL," +
-                            "image_path VARCHAR(255) NOT NULL," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "INDEX idx_repair_order_image_order_id (order_id)," +
-                            "CONSTRAINT fk_repair_order_image_order FOREIGN KEY (order_id) REFERENCES repair_order(id) ON DELETE CASCADE" +
-                            ")"
-            );
-            log.info("database migration success: ensured table repair_order_image");
-        } catch (DataAccessException ex) {
-            String message = ex.getMessage() == null ? "" : ex.getMessage();
-            if (message.contains("already exists")) {
-                log.info("database migration skipped: table repair_order_image already exists");
-            } else {
-                log.warn("database migration warning (repair_order_image): {}", message);
-            }
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS repair_order_flow (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "order_id BIGINT NOT NULL," +
-                            "from_status VARCHAR(40) DEFAULT NULL," +
-                            "to_status VARCHAR(40) NOT NULL," +
-                            "remark VARCHAR(255) DEFAULT NULL," +
-                            "operator_id BIGINT DEFAULT NULL," +
-                            "operator_name VARCHAR(50) DEFAULT NULL," +
-                            "operator_role VARCHAR(20) DEFAULT NULL," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "INDEX idx_repair_order_flow_order_id (order_id)," +
-                            "CONSTRAINT fk_repair_order_flow_order FOREIGN KEY (order_id) REFERENCES repair_order(id) ON DELETE CASCADE" +
-                            ")"
-            );
-            log.info("database migration success: ensured table repair_order_flow");
-        } catch (DataAccessException ex) {
-            String message = ex.getMessage() == null ? "" : ex.getMessage();
-            if (message.contains("already exists")) {
-                log.info("database migration skipped: table repair_order_flow already exists");
-            } else {
-                log.warn("database migration warning (repair_order_flow): {}", message);
-            }
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS service_category (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "code VARCHAR(32) NOT NULL UNIQUE," +
-                            "name VARCHAR(50) NOT NULL," +
-                            "sort INT NOT NULL DEFAULT 0," +
-                            "status TINYINT NOT NULL DEFAULT 1" +
-                            ")"
-            );
-            log.info("database migration success: ensured table service_category");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (service_category): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS convenience_service (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "provider_id BIGINT NOT NULL," +
-                            "name VARCHAR(100) NOT NULL," +
-                            "category_code VARCHAR(32) NOT NULL," +
-                            "summary VARCHAR(255) NOT NULL," +
-                            "description TEXT NOT NULL," +
-                            "contact_name VARCHAR(50) NOT NULL," +
-                            "contact_phone VARCHAR(20) NOT NULL," +
-                            "address VARCHAR(255) DEFAULT NULL," +
-                            "cover_image_path VARCHAR(255) DEFAULT NULL," +
-                            "service_status VARCHAR(20) NOT NULL DEFAULT 'RESERVABLE'," +
-                            "audit_status VARCHAR(20) NOT NULL DEFAULT 'PENDING'," +
-                            "audit_reason VARCHAR(255) DEFAULT NULL," +
-                            "reviewed_by BIGINT DEFAULT NULL," +
-                            "reviewed_at DATETIME DEFAULT NULL," +
-                            "max_capacity INT NOT NULL DEFAULT 50," +
-                            "current_booked INT NOT NULL DEFAULT 0," +
-                            "avg_score DECIMAL(4,2) NOT NULL DEFAULT 0.00," +
-                            "score_count INT NOT NULL DEFAULT 0," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
-                            "INDEX idx_convenience_service_provider (provider_id)," +
-                            "INDEX idx_convenience_service_audit_status (audit_status)," +
-                            "INDEX idx_convenience_service_service_status (service_status)," +
-                            "INDEX idx_convenience_service_category (category_code)," +
-                            "CONSTRAINT fk_convenience_service_provider FOREIGN KEY (provider_id) REFERENCES sys_user(id)," +
-                            "CONSTRAINT fk_convenience_service_reviewer FOREIGN KEY (reviewed_by) REFERENCES sys_user(id)" +
-                            ")"
-            );
-            log.info("database migration success: ensured table convenience_service");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (convenience_service): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS service_image (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "service_id BIGINT NOT NULL," +
-                            "image_path VARCHAR(255) NOT NULL," +
-                            "sort_no INT NOT NULL DEFAULT 0," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "INDEX idx_service_image_service_id (service_id)," +
-                            "CONSTRAINT fk_service_image_service FOREIGN KEY (service_id) REFERENCES convenience_service(id) ON DELETE CASCADE" +
-                            ")"
-            );
-            log.info("database migration success: ensured table service_image");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (service_image): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS service_audit_log (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "service_id BIGINT NOT NULL," +
-                            "from_audit_status VARCHAR(20) NOT NULL," +
-                            "to_audit_status VARCHAR(20) NOT NULL," +
-                            "action VARCHAR(20) NOT NULL," +
-                            "reason VARCHAR(255) DEFAULT NULL," +
-                            "reviewer_id BIGINT NOT NULL," +
-                            "reviewer_name VARCHAR(50) DEFAULT NULL," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "INDEX idx_service_audit_log_service_id (service_id)," +
-                            "CONSTRAINT fk_service_audit_log_service FOREIGN KEY (service_id) REFERENCES convenience_service(id) ON DELETE CASCADE" +
-                            ")"
-            );
-            log.info("database migration success: ensured table service_audit_log");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (service_audit_log): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS service_booking (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "service_id BIGINT NOT NULL," +
-                            "user_id BIGINT NOT NULL," +
-                            "contact_name VARCHAR(50) NOT NULL," +
-                            "contact_phone VARCHAR(20) NOT NULL," +
-                            "remark VARCHAR(255) DEFAULT NULL," +
-                            "status VARCHAR(20) NOT NULL DEFAULT 'BOOKED'," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," +
-                            "INDEX idx_service_booking_service_id (service_id)," +
-                            "INDEX idx_service_booking_user_id (user_id)," +
-                            "INDEX idx_service_booking_status (status)," +
-                            "CONSTRAINT fk_service_booking_service FOREIGN KEY (service_id) REFERENCES convenience_service(id) ON DELETE CASCADE," +
-                            "CONSTRAINT fk_service_booking_user FOREIGN KEY (user_id) REFERENCES sys_user(id)" +
-                            ")"
-            );
-            log.info("database migration success: ensured table service_booking");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (service_booking): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute(
-                    "CREATE TABLE IF NOT EXISTS service_review (" +
-                            "id BIGINT PRIMARY KEY AUTO_INCREMENT," +
-                            "service_id BIGINT NOT NULL," +
-                            "user_id BIGINT NOT NULL," +
-                            "rating TINYINT NOT NULL," +
-                            "content VARCHAR(500) DEFAULT NULL," +
-                            "reviewer_name VARCHAR(50) DEFAULT NULL," +
-                            "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                            "UNIQUE KEY uk_service_review_unique (service_id, user_id)," +
-                            "INDEX idx_service_review_service_id (service_id)," +
-                            "CONSTRAINT fk_service_review_service FOREIGN KEY (service_id) REFERENCES convenience_service(id) ON DELETE CASCADE," +
-                            "CONSTRAINT fk_service_review_user FOREIGN KEY (user_id) REFERENCES sys_user(id)" +
-                            ")"
-            );
-            log.info("database migration success: ensured table service_review");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (service_review): {}", ex.getMessage());
-        }
-
-        try {
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('HOUSEKEEPING', '家政保洁', 1, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('HOME_REPAIR', '家电维修', 2, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('ELDER_CARE', '养老照护', 3, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('CHILD_CARE', '托育陪护', 4, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('PET_CARE', '宠物服务', 5, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('ERRAND', '跑腿代办', 6, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('IT_SUPPORT', '数码协助', 7, 1)");
-            jdbcTemplate.execute("INSERT IGNORE INTO service_category (code, name, sort, status) VALUES ('COMMUNITY_CLASS', '社区课堂', 8, 1)");
-        } catch (DataAccessException ex) {
-            log.warn("database migration warning (init service_category data): {}", ex.getMessage());
+            log.warn(warnLogFormat, ex.getMessage());
         }
     }
 }

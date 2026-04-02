@@ -39,7 +39,7 @@ public class AliyunSmsGateway {
             SendSmsVerifyCodeResponse response = getClient().sendSmsVerifyCode(request).get();
             SendSmsVerifyCodeResponseBody body = response == null ? null : response.getBody();
             if (body == null) {
-                throw new BusinessException(502, "阿里云短信发送失败：响应体为空");
+                throw new BusinessException(502, "第三方服务调用失败");
             }
             SendSmsVerifyCodeResponseBody.Model model = body.getModel();
             return new AliyunSmsSendResult(
@@ -53,13 +53,13 @@ public class AliyunSmsGateway {
             );
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new BusinessException(500, "短信发送被中断");
+            throw new BusinessException(500, "短信服务请求被中断");
         } catch (ExecutionException ex) {
-            throw wrapException("短信发送", ex.getCause() == null ? ex : ex.getCause());
+            throw wrapException("发送短信验证码失败", ex.getCause() == null ? ex : ex.getCause());
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw wrapException("短信发送", ex);
+            throw wrapException("发送短信验证码失败", ex);
         }
     }
 
@@ -68,7 +68,7 @@ public class AliyunSmsGateway {
             CheckSmsVerifyCodeResponse response = getClient().checkSmsVerifyCode(request).get();
             CheckSmsVerifyCodeResponseBody body = response == null ? null : response.getBody();
             if (body == null) {
-                throw new BusinessException(502, "阿里云验证码校验失败：响应体为空");
+                throw new BusinessException(502, "第三方服务调用失败");
             }
             CheckSmsVerifyCodeResponseBody.Model model = body.getModel();
             return new AliyunSmsCheckResult(
@@ -80,13 +80,13 @@ public class AliyunSmsGateway {
             );
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
-            throw new BusinessException(500, "验证码校验被中断");
+            throw new BusinessException(500, "短信服务请求被中断");
         } catch (ExecutionException ex) {
-            throw wrapException("验证码校验", ex.getCause() == null ? ex : ex.getCause());
+            throw wrapException("校验短信验证码失败", ex.getCause() == null ? ex : ex.getCause());
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw wrapException("验证码校验", ex);
+            throw wrapException("校验短信验证码失败", ex);
         }
     }
 
@@ -122,7 +122,7 @@ public class AliyunSmsGateway {
                 } catch (BusinessException ex) {
                     throw ex;
                 } catch (Exception ex) {
-                    throw wrapException("初始化阿里云短信客户端", ex);
+                    throw wrapException("初始化短信客户端失败", ex);
                 }
             }
             return client;
@@ -143,16 +143,16 @@ public class AliyunSmsGateway {
     private BusinessException wrapException(String action, Throwable throwable) {
         String message = throwable == null ? null : throwable.getMessage();
         if (message == null) {
-            message = "unknown error";
+            message = "未知错误";
         }
         if (message.contains("accessKeyId/accessKeySecret cannot be empty")) {
             return new BusinessException(500,
-                    action + "失败：阿里云 AK/SK 未配置。请设置环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID 和 ALIBABA_CLOUD_ACCESS_KEY_SECRET，或在 application.yml 的 sms.access-key-id / sms.access-key-secret 配置。");
+                    action + "：未配置阿里云短信 AK/SK，请在环境变量 ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET 或 application.yml 的 sms.access-key-id / sms.access-key-secret 中配置。");
         }
         if (message.contains("credentials file is not exist")) {
             return new BusinessException(500,
-                    action + "失败：当前环境配置了阿里云 Profile 但未找到凭证文件。建议改为配置 AK/SK（环境变量或 application.yml）。");
+                    action + "：未找到可用的阿里云凭证，请检查运行环境凭证或 application.yml 配置。");
         }
-        return new BusinessException(502, action + "失败：" + message);
+        return new BusinessException(502, action + "，第三方短信服务调用失败");
     }
 }

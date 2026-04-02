@@ -24,40 +24,53 @@ yarn-error.log*
 pnpm-debug.log*
 
 # =========================
-# Backend (Spring Boot / Maven)
+# Environment / local secrets
 # =========================
-backend/target/
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# =========================
+# Java / Maven / Spring Boot
+# =========================
+**/target/
 backend/*.out.log
 backend/*.err.log
 backend/*.out
 backend/*.err
-/target/
+*.class
+*.jar
+*.war
 
 # =========================
-# Frontend (Vue / Vite / npm)
+# Node / Vite / Ionic
 # =========================
-frontend/node_modules/
-frontend/dist/
-frontend/.npm-cache/
-frontend/.vite/
-frontend/coverage/
-/node_modules/
-/dist/
+**/node_modules/
+**/dist/
+**/.vite/
+**/.npm-cache/
+**/coverage/
+
+# =========================
+# Mobile (Capacitor native build outputs)
+# =========================
+mobileend/android/.gradle/
+mobileend/android/build/
+mobileend/android/app/build/
+mobileend/android/local.properties
+mobileend/android/captures/
+mobileend/android/.idea/
+mobileend/android/*.iml
+mobileend/ios/App/build/
+mobileend/ios/App/Pods/
+mobileend/ios/App/App.xcworkspace/
+mobileend/ios/App/DerivedData/
 
 # =========================
 # Runtime uploads / temp data
 # =========================
 backend/uploads/
-/uploads/
 backend/temp/
-/temp/
-
-# =========================
-# Build artifacts (general)
-# =========================
-*.class
-*.jar
-*.war
-
-# Note:
-# As requested, application.yml and .env are NOT ignored.
+uploads/
+temp/

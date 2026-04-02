@@ -42,6 +42,7 @@ public class SysUserServiceImpl implements SysUserService {
     private static final String ALIYUN_OK = "OK";
     private static final String VERIFY_PASS = "PASS";
     private static final Pattern PHONE_PATTERN = Pattern.compile("^\\d{11}$");
+    private static final int MAX_AVATAR_PATH_LEN = 255;
 
     private final SysUserMapper userMapper;
     private final JwtUtil jwtUtil;
@@ -68,10 +69,10 @@ public class SysUserServiceImpl implements SysUserService {
     @Transactional(rollbackFor = Exception.class)
     public SysUser register(RegisterRequest request) {
         if (!UserRole.isValid(request.getRole())) {
-            throw new BusinessException("角色不合法");
+            throw new BusinessException("操作失败");
         }
         if (userMapper.selectByUsername(request.getUsername()) != null) {
-            throw new BusinessException("用户名已存在");
+            throw new BusinessException("操作失败");
         }
 
         String phone = defaultPhoneIfBlank(request.getPhone());
@@ -82,6 +83,7 @@ public class SysUserServiceImpl implements SysUserService {
         user.setPassword(PasswordUtil.encrypt(request.getPassword()));
         user.setPhone(phone);
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
+        user.setAvatarPath(normalizeAvatarPath(request.getAvatarPath()));
         user.setRole(request.getRole());
         user.setStatus(1);
 
@@ -96,10 +98,10 @@ public class SysUserServiceImpl implements SysUserService {
     public LoginResponse login(LoginRequest request) {
         SysUser user = userMapper.selectByUsername(request.getUsername());
         if (user == null || !PasswordUtil.matches(request.getPassword(), user.getPassword())) {
-            throw new BusinessException(401, "账号或密码错误");
+            throw new BusinessException(401, "请先登录");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new BusinessException(403, "账号已禁用");
+            throw new BusinessException(403, "无权限访问");
         }
         return buildLoginResponse(user);
     }
@@ -126,12 +128,12 @@ public class SysUserServiceImpl implements SysUserService {
         assertPhoneValid(phone);
 
         if (!StringUtils.hasText(signName) || !StringUtils.hasText(templateCode)) {
-            throw new BusinessException("短信签名 SignName 或模板 TemplateCode 未配置");
+            throw new BusinessException("操作失败");
         }
 
         String intervalKey = smsIntervalKey(countryCode, phone);
         if (intervalSeconds > 0 && Boolean.TRUE.equals(redisTemplate.hasKey(intervalKey))) {
-            throw new BusinessException("验证码发送过于频繁，请稍后重试");
+            throw new BusinessException("操作失败");
         }
 
         SendSmsVerifyCodeRequest.Builder builder = SendSmsVerifyCodeRequest.builder()
@@ -155,7 +157,7 @@ public class SysUserServiceImpl implements SysUserService {
 
         AliyunSmsSendResult sendResult = aliyunSmsGateway.sendSmsVerifyCode(builder.build());
         if (!ALIYUN_OK.equalsIgnoreCase(sendResult.getCode()) || !Boolean.TRUE.equals(sendResult.getSuccess())) {
-            throw new BusinessException(502, "短信发送失败：" + sendResult.getMessage() + " (" + sendResult.getCode() + ")");
+            throw new BusinessException(502, "第三方服务调用失败");
         }
 
         if (intervalSeconds > 0) {
@@ -198,18 +200,18 @@ public class SysUserServiceImpl implements SysUserService {
 
         AliyunSmsCheckResult checkResult = aliyunSmsGateway.checkSmsVerifyCode(checkRequestBuilder.build());
         if (!ALIYUN_OK.equalsIgnoreCase(checkResult.getCode()) || !Boolean.TRUE.equals(checkResult.getSuccess())) {
-            throw new BusinessException(400, "验证码校验失败：" + checkResult.getMessage() + " (" + checkResult.getCode() + ")");
+            throw new BusinessException(400, "请求参数不合法");
         }
         if (!VERIFY_PASS.equalsIgnoreCase(checkResult.getVerifyResult())) {
-            throw new BusinessException(400, "验证码错误或已过期");
+            throw new BusinessException(400, "请求参数不合法");
         }
 
         SysUser user = userMapper.selectByPhone(phone);
         if (user == null) {
-            throw new BusinessException(404, "手机号未绑定账号，请先注册");
+            throw new BusinessException(404, "资源不存在");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new BusinessException(403, "账号已禁用");
+            throw new BusinessException(403, "无权限访问");
         }
         return buildLoginResponse(user);
     }
@@ -233,7 +235,7 @@ public class SysUserServiceImpl implements SysUserService {
         }
         SysUser user = userMapper.selectById(id);
         if (user == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException("操作失败");
         }
         refreshUserCache(user);
         return user;
@@ -244,7 +246,7 @@ public class SysUserServiceImpl implements SysUserService {
     public SysUser createUser(UserRequest request) {
         validateCreateOrUpdateRequest(request, true);
         if (userMapper.selectByUsername(request.getUsername()) != null) {
-            throw new BusinessException("用户名已存在");
+            throw new BusinessException("操作失败");
         }
 
         SysUser user = new SysUser();
@@ -252,6 +254,7 @@ public class SysUserServiceImpl implements SysUserService {
         user.setPassword(PasswordUtil.encrypt(request.getPassword()));
         user.setPhone(defaultPhoneIfBlank(request.getPhone()));
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
+        user.setAvatarPath(normalizeAvatarPath(request.getAvatarPath()));
         user.setRole(request.getRole());
         user.setStatus(request.getStatus() == null ? 1 : request.getStatus());
 
@@ -267,14 +270,14 @@ public class SysUserServiceImpl implements SysUserService {
     public SysUser updateUser(Long id, UserRequest request) {
         SysUser existing = userMapper.selectById(id);
         if (existing == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException("操作失败");
         }
         validateCreateOrUpdateRequest(request, false);
 
         if (StringUtils.hasText(request.getUsername()) && !request.getUsername().equals(existing.getUsername())) {
             SysUser target = userMapper.selectByUsername(request.getUsername());
             if (target != null && !target.getId().equals(id)) {
-                throw new BusinessException("用户名已存在");
+                throw new BusinessException("操作失败");
             }
             existing.setUsername(request.getUsername());
         }
@@ -286,6 +289,9 @@ public class SysUserServiceImpl implements SysUserService {
         }
         if (request.getNickname() != null) {
             existing.setNickname(request.getNickname());
+        }
+        if (request.getAvatarPath() != null) {
+            existing.setAvatarPath(normalizeAvatarPath(request.getAvatarPath()));
         }
         if (StringUtils.hasText(request.getRole())) {
             existing.setRole(request.getRole());
@@ -306,7 +312,7 @@ public class SysUserServiceImpl implements SysUserService {
     public void deleteUser(Long id) {
         SysUser existing = userMapper.selectById(id);
         if (existing == null) {
-            throw new BusinessException("用户不存在");
+            throw new BusinessException("操作失败");
         }
         userMapper.deleteById(id);
         redisTemplate.delete(userKey(id));
@@ -317,7 +323,7 @@ public class SysUserServiceImpl implements SysUserService {
     public SysUser getByUsername(String username) {
         SysUser user = userMapper.selectByUsername(username);
         if (user == null) {
-            throw new BusinessException(404, "用户不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         return user;
     }
@@ -326,26 +332,29 @@ public class SysUserServiceImpl implements SysUserService {
     public SysUser getByPhone(String phone) {
         SysUser user = userMapper.selectByPhone(phone);
         if (user == null) {
-            throw new BusinessException(404, "用户不存在");
+            throw new BusinessException(404, "资源不存在");
         }
         return user;
     }
 
     private void validateCreateOrUpdateRequest(UserRequest request, boolean create) {
         if (create && !StringUtils.hasText(request.getUsername())) {
-            throw new BusinessException("用户名不能为空");
+            throw new BusinessException("操作失败");
         }
         if (create && !StringUtils.hasText(request.getPassword())) {
-            throw new BusinessException("密码不能为空");
+            throw new BusinessException("操作失败");
         }
         if (create && !StringUtils.hasText(request.getRole())) {
-            throw new BusinessException("角色不能为空");
+            throw new BusinessException("操作失败");
         }
         if (StringUtils.hasText(request.getRole()) && !UserRole.isValid(request.getRole())) {
-            throw new BusinessException("角色不合法");
+            throw new BusinessException("操作失败");
         }
         if (StringUtils.hasText(request.getPhone())) {
             assertPhoneValid(request.getPhone());
+        }
+        if (request.getAvatarPath() != null && request.getAvatarPath().length() > MAX_AVATAR_PATH_LEN) {
+            throw new BusinessException("操作失败");
         }
     }
 
@@ -366,7 +375,7 @@ public class SysUserServiceImpl implements SysUserService {
             if (value == 1 || value == 2) {
                 return value;
             }
-            throw new BusinessException("caseAuthPolicy 仅支持 1 或 2");
+            throw new BusinessException("操作失败");
         }
 
         String upperValue = caseAuthPolicy.trim().toUpperCase();
@@ -376,7 +385,7 @@ public class SysUserServiceImpl implements SysUserService {
         if ("STRICT".equals(upperValue) || "CASE_SENSITIVE".equals(upperValue)) {
             return 2;
         }
-        throw new BusinessException("caseAuthPolicy 不合法");
+        throw new BusinessException("操作失败");
     }
 
     private long resolveLong(Long requestValue, long defaultValue) {
@@ -393,12 +402,26 @@ public class SysUserServiceImpl implements SysUserService {
 
     private void assertPhoneValid(String phone) {
         if (!PHONE_PATTERN.matcher(phone).matches()) {
-            throw new BusinessException("手机号格式不正确");
+            throw new BusinessException("操作失败");
         }
     }
 
     private String defaultPhoneIfBlank(String phone) {
         return StringUtils.hasText(phone) ? phone : smsLoginProperties.getDefaultPhoneNumber();
+    }
+
+    private String normalizeAvatarPath(String avatarPath) {
+        if (!StringUtils.hasText(avatarPath)) {
+            return null;
+        }
+        String normalized = avatarPath.trim();
+        if (normalized.length() > MAX_AVATAR_PATH_LEN) {
+            throw new BusinessException("操作失败");
+        }
+        if (normalized.contains("..")) {
+            throw new BusinessException("操作失败");
+        }
+        return normalized;
     }
 
     private List<SysUser> convertToUserList(Object cached) {

@@ -49,6 +49,9 @@ public class ShiroConfig {
         chainDefinitionMap.put("/api/health", "anon");
         chainDefinitionMap.put("/api/repair/file", "anon");
         chainDefinitionMap.put("/api/services/file", "anon");
+        chainDefinitionMap.put("/api/social/file", "anon");
+        chainDefinitionMap.put("/api/electricity/notify", "anon");
+        chainDefinitionMap.put("/ws/**", "anon");
         chainDefinitionMap.put("/error", "anon");
         chainDefinitionMap.put("/**", "jwt");
         filterFactoryBean.setFilterChainDefinitionMap(chainDefinitionMap);

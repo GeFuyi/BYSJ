@@ -1,38 +1,75 @@
-# 城市社区便民服务整合 APP（基础框架）
+# 社区便民服务系统
 
-当前已实现前后端分离基础版：
+本仓库包含三个子项目：
+- `backend`：Spring Boot 后端
+- `frontend`：Web 管理端（Vue3 + Element Plus）
+- `mobileend`：移动端（Ionic Vue + Capacitor）
 
-- 前端：Vue3 + Vite + Element Plus + Axios
-- 后端：Spring Boot + MyBatis + MySQL + Redis + Shiro + JWT
-- 已实现：
-1. 账号密码注册登录
-2. 手机号绑定（`sys_user.phone`）
-3. 手机号短信验证码登录（验证码存 Redis 核验，预留阿里云对接点）
-4. 三角色（管理员/员工/用户）
-5. 人员管理 CRUD
+## 系统架构
 
-## 1. 项目结构
+```mermaid
+flowchart LR
+    A[Web 前端 frontend] -->|HTTP/JSON| B[backend]
+    C[移动端 mobileend] -->|HTTP + WebSocket| B
+    B --> D[(MySQL)]
+    B --> E[(Redis)]
+    B --> F[本地文件存储 uploads]
+    B --> G[支付宝开放平台]
+    B --> H[阿里云短信]
+```
+
+## 核心功能
+
+- 账号体系：账号密码登录、短信验证码登录、JWT 鉴权、角色控制（ADMIN/EMPLOYEE/USER）
+- 人员管理：用户信息维护、头像上传、按角色管理
+- 便民服务：服务发布、审核、上下架、预约、评价
+- 物业报修：工单提交、图片上传、流程流转、备注与进度图、状态回退
+- 电费代缴：电费订单创建、支付状态刷新、支付宝回调、生活缴费跳转
+- 邻里圈与聊天：朋友圈动态、评论/回复、好友、私聊、群聊、群公告、群公告确认、群消息免打扰
+- 实时能力：在线用户维护、离线消息入 Redis 并补拉、WebSocket 实时推送
+
+## 角色与可见范围
+
+- `USER`：查看和处理自己的报修工单；使用便民、邻里圈、聊天等用户功能
+- `EMPLOYEE`：可查看全量报修工单并处理流程；可使用服务提供方功能
+- `ADMIN`：可查看全量报修工单；拥有审核与系统管理能力
+
+报修工单规则：
+- 管理员/员工：默认查看全量工单
+- 普通用户：仅查看自己的工单
+
+## 项目结构
 
 ```text
 .
-├─ backend   # Spring Boot 后端
-└─ frontend  # Vue 管理端
+├─ backend      # Spring Boot + MyBatis + MySQL + Redis + WebSocket
+├─ frontend     # Web 管理端（保留原有实现）
+└─ mobileend    # Ionic Vue + Capacitor 移动端
 ```
 
-## 2. 后端启动
+## 快速启动
 
-1. 准备 MySQL（8.x）和 Redis（6.x/7.x）。
-2. 在 MySQL 中创建数据库：
+### 1. 环境准备
+
+- JDK 8+
+- Maven 3.8+
+- MySQL 8.x
+- Redis 6.x/7.x
+- Node.js 18+
+
+### 2. 初始化数据库
+
+创建数据库：
 
 ```sql
 CREATE DATABASE community_app DEFAULT CHARACTER SET utf8mb4;
 ```
 
-3. 修改 `backend/src/main/resources/application.yml` 中数据库账号密码。
-4. 首次初始化执行：
-   - `backend/src/main/resources/schema.sql`
-   - `backend/src/main/resources/data.sql`
-5. 启动后端：
+说明：
+- `backend` 启动时会自动执行 `schema.sql` 建表和部分迁移逻辑
+- 演示账号数据请手动执行 `backend/src/main/resources/data.sql`
+
+### 3. 启动后端
 
 ```bash
 cd backend
@@ -41,11 +78,7 @@ mvn spring-boot:run
 
 默认端口：`8080`
 
-说明：
-- 对于旧数据库（没有 `phone` 字段），系统启动时会自动尝试补字段。
-- 也可手动执行：`backend/src/main/resources/migration_add_phone.sql`
-
-## 3. 前端启动
+### 4. 启动 Web 前端（可选）
 
 ```bash
 cd frontend
@@ -53,49 +86,56 @@ npm install
 npm run dev
 ```
 
-默认端口：`5173`（已代理 `/api` 到 `http://localhost:8080`）
+### 5. 启动移动端
 
-## 4. 默认账号
+```bash
+cd mobileend
+npm install
+npm run dev
+```
+
+Android 打包参考 [mobileend/README.md](./mobileend/README.md)。
+
+## 配置说明
+
+后端配置文件：`backend/src/main/resources/application.yml`
+
+重点配置项：
+- 数据库：`spring.datasource.*`
+- Redis：`spring.redis.*`
+- JWT：`jwt.secret`、`jwt.expiration`
+- 短信：`sms.*`
+- 支付宝：`alipay.*`
+- 上传目录：`repair.upload-dir`、`service-platform.upload-dir`、`social.upload-dir`
+
+移动端配置文件：`mobileend/.env`
+
+```env
+VITE_API_BASE_URL=http://10.0.2.2:8080/api
+VITE_WS_BASE_URL=ws://10.0.2.2:8080
+```
+
+使用 ngrok 时请改为你的公网地址，例如：
+- `VITE_API_BASE_URL=https://xxxx.ngrok-free.dev/api`
+- `VITE_WS_BASE_URL=wss://xxxx.ngrok-free.dev`
+
+## 默认测试账号（执行 data.sql 后）
 
 - 管理员：`admin / admin123`
 - 员工：`employee / employee123`
 - 用户：`user / user123`
 
-默认手机号（初始化数据）：`15138114047`
+## Git 上传建议
 
-## 5. 接口列表
+当前 `.gitignore` 已忽略以下无需上传内容：
+- 构建产物（`target/`、`dist/`、`build/`）
+- 依赖目录（`node_modules/`）
+- 本地环境文件（`.env*`，保留 `.env.example`）
+- Android/iOS 本地编译缓存
+- 运行时上传目录（`uploads/`、`temp/`）
 
-认证相关：
-- `POST /api/auth/register` 注册（支持手机号）
-- `POST /api/auth/login` 账号密码登录
-- `POST /api/auth/sms/send` 发送短信验证码
-- `POST /api/auth/sms/login` 手机号验证码登录
+如果某些文件已被 Git 跟踪，需要先取消跟踪再提交：
 
-用户相关：
-- `GET /api/users/me` 当前登录用户
-- `GET /api/users` 用户列表（ADMIN/EMPLOYEE）
-- `GET /api/users/{id}` 用户详情（ADMIN/EMPLOYEE）
-- `POST /api/users` 创建用户（ADMIN/EMPLOYEE）
-- `PUT /api/users/{id}` 更新用户（ADMIN/EMPLOYEE）
-- `DELETE /api/users/{id}` 删除用户（ADMIN）
-
-## 6. Redis 缓存策略
-
-- 用户详情缓存：`sys:user:{id}`
-- 用户列表缓存：`sys:user:list`
-- 短信验证码缓存：`sms:login:code:{countryCode}:{phone}`
-- 发送频控缓存：`sms:login:interval:{countryCode}:{phone}`
-
-## 7. 短信参数配置
-
-在 `backend/src/main/resources/application.yml` 中：
-
-- `sms.scheme-name` 方案名称
-- `sms.default-country-code` 默认国家编码
-- `sms.default-phone-number` 默认手机号
-- `sms.code-length` 验证码长度（4~8）
-- `sms.valid-minutes` 验证码有效分钟数
-- `sms.interval-seconds` 发送间隔秒数
-- `sms.return-verify-code` 是否返回验证码（开发阶段建议 `true`）
-
-已实现直接接入阿里云真实短信网关（AK/SK + API 调用），可以在现有接口上无缝替换发送与校验实现（仅支持阿里云绑定的测试手机号码使用）。
+```bash
+git rm -r --cached <path>
+```

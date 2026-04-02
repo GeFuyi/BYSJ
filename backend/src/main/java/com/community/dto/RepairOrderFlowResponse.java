@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 public class RepairOrderFlowResponse {
@@ -16,9 +17,10 @@ public class RepairOrderFlowResponse {
     private String remark;
     private Long operatorId;
     private String operatorName;
+    private String operatorAvatarPath;
     private String operatorRole;
+    private List<String> imagePaths;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createdAt;
 }
-

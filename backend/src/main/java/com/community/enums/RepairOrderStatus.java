@@ -9,12 +9,12 @@ import java.util.Map;
 import java.util.Set;
 
 public enum RepairOrderStatus {
-    SUBMITTED("用户提交报修"),
-    ACCEPTED("物业接单"),
-    IN_PROGRESS("维修中"),
-    COMPLETED_PENDING_CONFIRM("维修完成待确认"),
-    COMPLETED("维修完成（用户确认）"),
-    ROLLBACK("异常回退");
+    SUBMITTED("\u5df2\u63d0\u4ea4"),
+    ACCEPTED("\u5df2\u53d7\u7406"),
+    IN_PROGRESS("\u5904\u7406\u4e2d"),
+    COMPLETED_PENDING_CONFIRM("\u5f85\u7528\u6237\u786e\u8ba4"),
+    COMPLETED("\u5df2\u5b8c\u6210"),
+    ROLLBACK("\u5f02\u5e38\u56de\u9000");
 
     private static final Map<RepairOrderStatus, Set<RepairOrderStatus>> TRANSITIONS = new HashMap<>();
 
@@ -41,7 +41,7 @@ public enum RepairOrderStatus {
         try {
             return valueOf(code);
         } catch (Exception ex) {
-            throw new BusinessException("不支持的报修状态: " + code);
+            throw new BusinessException("操作失败");
         }
     }
 
@@ -75,4 +75,3 @@ public enum RepairOrderStatus {
         return new HashSet<>(Arrays.asList(statuses));
     }
 }
-

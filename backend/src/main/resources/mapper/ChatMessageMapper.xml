@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ChatMessageMapper">
+
+    <resultMap id="ChatMessageResultMap" type="com.community.entity.ChatMessage">
+        <id property="id" column="id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="receiverType" column="receiver_type"/>
+        <result property="receiverId" column="receiver_id"/>
+        <result property="content" column="content"/>
+        <result property="imagePaths" column="image_paths"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.ChatMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_message (sender_id, receiver_type, receiver_id, content, image_paths)
+        VALUES (#{senderId}, #{receiverType}, #{receiverId}, #{content}, #{imagePaths})
+    </insert>
+
+    <select id="selectPrivateHistory" resultMap="ChatMessageResultMap">
+        SELECT id, sender_id, receiver_type, receiver_id, content, image_paths, created_at
+        FROM chat_message
+        WHERE receiver_type = 'PRIVATE'
+          AND (
+            (sender_id = #{userA} AND receiver_id = #{userB})
+            OR
+            (sender_id = #{userB} AND receiver_id = #{userA})
+          )
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectGroupHistory" resultMap="ChatMessageResultMap">
+        SELECT id, sender_id, receiver_type, receiver_id, content, image_paths, created_at
+        FROM chat_message
+        WHERE receiver_type = 'GROUP'
+          AND receiver_id = #{groupId}
+        ORDER BY id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
+

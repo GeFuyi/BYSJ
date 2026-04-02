@@ -9,21 +9,24 @@ import javax.validation.constraints.Size;
 @Data
 public class RegisterRequest {
 
-    @NotBlank(message = "用户名不能为空")
-    @Size(min = 4, max = 20, message = "用户名长度需在4-20位")
+    @NotBlank(message = "不能为空")
+    @Size(min = 4, max = 20, message = "长度不合法")
     private String username;
 
-    @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 32, message = "密码长度需在6-32位")
+    @NotBlank(message = "不能为空")
+    @Size(min = 6, max = 32, message = "长度不合法")
     private String password;
 
-    @Pattern(regexp = "^\\d{11}$", message = "手机号格式不正确")
+    @Pattern(regexp = "^\\d{11}$", message = "格式不正确")
     private String phone;
 
-    @Size(max = 30, message = "昵称最多30位")
+    @Size(max = 30, message = "长度不合法")
     private String nickname;
 
-    @NotBlank(message = "角色不能为空")
-    @Pattern(regexp = "ADMIN|EMPLOYEE|USER", message = "角色仅支持ADMIN/EMPLOYEE/USER")
+    @Size(max = 255, message = "长度不合法")
+    private String avatarPath;
+
+    @NotBlank(message = "不能为空")
+    @Pattern(regexp = "ADMIN|EMPLOYEE|USER", message = "格式不正确")
     private String role;
 }

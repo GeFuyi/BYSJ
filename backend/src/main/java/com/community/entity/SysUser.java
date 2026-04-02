@@ -16,6 +16,7 @@ public class SysUser implements Serializable {
     private String password;
     private String phone;
     private String nickname;
+    private String avatarPath;
     private String role;
     private Integer status;
 

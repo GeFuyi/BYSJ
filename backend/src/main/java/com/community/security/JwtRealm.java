@@ -33,7 +33,7 @@ public class JwtRealm extends AuthorizingRealm {
     protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken token) throws AuthenticationException {
         String jwt = (String) token.getCredentials();
         if (!jwtUtil.validate(jwt)) {
-            throw new AuthenticationException("Token无效");
+            throw new AuthenticationException("认证失败");
         }
 
         String username = jwtUtil.getUsername(jwt);
@@ -42,7 +42,7 @@ public class JwtRealm extends AuthorizingRealm {
             throw new UnknownAccountException("用户不存在");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
-            throw new AuthenticationException("账号已禁用");
+            throw new AuthenticationException("认证失败");
         }
         return new SimpleAuthenticationInfo(username, jwt, getName());
     }

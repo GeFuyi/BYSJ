@@ -1,0 +1,8 @@
+{
+  "name": "community-mobile",
+  "type": "vue",
+  "integrations": {
+    "capacitor": {}
+  }
+}
+

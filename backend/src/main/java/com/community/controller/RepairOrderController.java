@@ -51,8 +51,9 @@ public class RepairOrderController {
     }
 
     @GetMapping("/orders")
-    public ApiResponse<List<RepairOrderListItemResponse>> listOrders(@RequestParam(value = "status", required = false) String status) {
-        return ApiResponse.success(repairOrderService.listOrders(status, currentUser()));
+    public ApiResponse<List<RepairOrderListItemResponse>> listOrders(@RequestParam(value = "status", required = false) String status,
+                                                                      @RequestParam(value = "mineOnly", required = false) Boolean mineOnly) {
+        return ApiResponse.success(repairOrderService.listOrders(status, mineOnly, currentUser()));
     }
 
     @GetMapping("/orders/{id}")
@@ -90,4 +91,3 @@ public class RepairOrderController {
         return userService.getByUsername(String.valueOf(principal));
     }
 }
-

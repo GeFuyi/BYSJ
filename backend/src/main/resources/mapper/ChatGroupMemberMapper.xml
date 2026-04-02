@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.ChatGroupMemberMapper">
+
+    <resultMap id="ChatGroupMemberResultMap" type="com.community.entity.ChatGroupMember">
+        <id property="id" column="id"/>
+        <result property="groupId" column="group_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="role" column="role"/>
+        <result property="muted" column="muted"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.ChatGroupMember" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_group_member (group_id, user_id, role, muted)
+        VALUES (#{groupId}, #{userId}, #{role}, #{muted})
+    </insert>
+
+    <select id="selectByGroupAndUser" resultMap="ChatGroupMemberResultMap">
+        SELECT id, group_id, user_id, role, muted, created_at
+        FROM chat_group_member
+        WHERE group_id = #{groupId}
+          AND user_id = #{userId}
+        LIMIT 1
+    </select>
+
+    <select id="selectByGroupId" resultMap="ChatGroupMemberResultMap">
+        SELECT id, group_id, user_id, role, muted, created_at
+        FROM chat_group_member
+        WHERE group_id = #{groupId}
+        ORDER BY id ASC
+    </select>
+
+    <select id="selectByUserId" resultMap="ChatGroupMemberResultMap">
+        SELECT id, group_id, user_id, role, muted, created_at
+        FROM chat_group_member
+        WHERE user_id = #{userId}
+        ORDER BY id DESC
+    </select>
+
+    <update id="updateMuted">
+        UPDATE chat_group_member
+        SET muted = #{muted}
+        WHERE group_id = #{groupId}
+          AND user_id = #{userId}
+    </update>
+
+    <update id="updateRole">
+        UPDATE chat_group_member
+        SET role = #{role}
+        WHERE group_id = #{groupId}
+          AND user_id = #{userId}
+    </update>
+
+    <delete id="deleteByGroupAndUser">
+        DELETE FROM chat_group_member
+        WHERE group_id = #{groupId}
+          AND user_id = #{userId}
+    </delete>
+
+    <delete id="deleteByGroupId">
+        DELETE FROM chat_group_member
+        WHERE group_id = #{groupId}
+    </delete>
+
+    <select id="countByGroupId" resultType="int">
+        SELECT COUNT(1)
+        FROM chat_group_member
+        WHERE group_id = #{groupId}
+    </select>
+
+    <select id="selectFirstByGroupId" resultMap="ChatGroupMemberResultMap">
+        SELECT id, group_id, user_id, role, muted, created_at
+        FROM chat_group_member
+        WHERE group_id = #{groupId}
+        ORDER BY id ASC
+        LIMIT 1
+    </select>
+
+</mapper>

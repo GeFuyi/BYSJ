@@ -10,12 +10,11 @@ import javax.validation.constraints.Size;
 @Data
 public class ServiceReviewCreateRequest {
 
-    @NotNull(message = "评分不能为空")
-    @Min(value = 1, message = "评分最小为1")
-    @Max(value = 5, message = "评分最大为5")
+    @NotNull(message = "不能为空")
+    @Min(value = 1, message = "数值过小")
+    @Max(value = 5, message = "数值过大")
     private Integer rating;
 
-    @Size(max = 500, message = "评价内容最多500字符")
+    @Size(max = 500, message = "长度不合法")
     private String content;
 }
-

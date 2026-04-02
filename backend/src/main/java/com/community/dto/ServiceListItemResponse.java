@@ -12,6 +12,7 @@ public class ServiceListItemResponse {
     private Long id;
     private Long providerId;
     private String providerName;
+    private String providerAvatarPath;
     private String name;
     private String categoryCode;
     private String categoryName;
@@ -35,4 +36,3 @@ public class ServiceListItemResponse {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date updatedAt;
 }
-

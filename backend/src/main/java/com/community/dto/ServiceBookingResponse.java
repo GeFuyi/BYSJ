@@ -11,6 +11,8 @@ public class ServiceBookingResponse {
     private Long id;
     private Long serviceId;
     private Long userId;
+    private String userNickname;
+    private String userAvatarPath;
     private String serviceName;
     private String contactName;
     private String contactPhone;
@@ -21,4 +23,3 @@ public class ServiceBookingResponse {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createdAt;
 }
-

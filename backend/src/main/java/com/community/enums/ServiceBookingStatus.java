@@ -3,8 +3,8 @@ package com.community.enums;
 import com.community.common.BusinessException;
 
 public enum ServiceBookingStatus {
-    BOOKED("已预约"),
-    CANCELLED("已取消");
+    BOOKED("\u5df2\u9884\u7ea6"),
+    CANCELLED("\u5df2\u53d6\u6d88");
 
     private final String label;
 
@@ -20,8 +20,7 @@ public enum ServiceBookingStatus {
         try {
             return valueOf(code);
         } catch (Exception ex) {
-            throw new BusinessException("不支持的预约状态: " + code);
+            throw new BusinessException("操作失败");
         }
     }
 }
-

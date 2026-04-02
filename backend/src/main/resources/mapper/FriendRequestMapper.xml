@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.FriendRequestMapper">
+
+    <resultMap id="FriendRequestResultMap" type="com.community.entity.FriendRequest">
+        <id property="id" column="id"/>
+        <result property="requesterId" column="requester_id"/>
+        <result property="targetUserId" column="target_user_id"/>
+        <result property="status" column="status"/>
+        <result property="message" column="message"/>
+        <result property="handledBy" column="handled_by"/>
+        <result property="handledAt" column="handled_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.FriendRequest" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO friend_request (requester_id, target_user_id, status, message, handled_by, handled_at)
+        VALUES (#{requesterId}, #{targetUserId}, #{status}, #{message}, #{handledBy}, #{handledAt})
+    </insert>
+
+    <select id="selectById" resultMap="FriendRequestResultMap">
+        SELECT id, requester_id, target_user_id, status, message, handled_by, handled_at, created_at, updated_at
+        FROM friend_request
+        WHERE id = #{id}
+        LIMIT 1
+    </select>
+
+    <select id="selectPending" resultMap="FriendRequestResultMap">
+        SELECT id, requester_id, target_user_id, status, message, handled_by, handled_at, created_at, updated_at
+        FROM friend_request
+        WHERE requester_id = #{requesterId}
+          AND target_user_id = #{targetUserId}
+          AND status = 'PENDING'
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectPendingByTarget" resultMap="FriendRequestResultMap">
+        SELECT id, requester_id, target_user_id, status, message, handled_by, handled_at, created_at, updated_at
+        FROM friend_request
+        WHERE target_user_id = #{targetUserId}
+          AND status = 'PENDING'
+        ORDER BY id DESC
+    </select>
+
+    <update id="updateStatus">
+        UPDATE friend_request
+        SET status = #{status},
+            handled_by = #{handledBy},
+            handled_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

@@ -11,8 +11,7 @@ public enum ServiceAuditAction {
         try {
             return valueOf(code);
         } catch (Exception ex) {
-            throw new BusinessException("不支持的审核动作: " + code);
+            throw new BusinessException("操作失败");
         }
     }
 }
-

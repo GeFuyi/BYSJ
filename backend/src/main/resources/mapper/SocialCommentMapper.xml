@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.SocialCommentMapper">
+
+    <resultMap id="SocialCommentResultMap" type="com.community.entity.SocialComment">
+        <id property="id" column="id"/>
+        <result property="postId" column="post_id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="replyToUserId" column="reply_to_user_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="content" column="content"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.community.entity.SocialComment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO social_comment (post_id, parent_id, reply_to_user_id, user_id, content)
+        VALUES (#{postId}, #{parentId}, #{replyToUserId}, #{userId}, #{content})
+    </insert>
+
+    <select id="selectById" resultMap="SocialCommentResultMap">
+        SELECT id, post_id, parent_id, reply_to_user_id, user_id, content, created_at
+        FROM social_comment
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByPostId" resultMap="SocialCommentResultMap">
+        SELECT id, post_id, parent_id, reply_to_user_id, user_id, content, created_at
+        FROM social_comment
+        WHERE post_id = #{postId}
+        ORDER BY id ASC
+    </select>
+
+</mapper>
+

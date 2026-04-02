@@ -5,6 +5,7 @@ import com.community.common.BusinessException;
 import com.community.dto.UserRequest;
 import com.community.dto.UserResponse;
 import com.community.entity.SysUser;
+import com.community.service.SocialStorageService;
 import com.community.service.SysUserService;
 import org.apache.shiro.SecurityUtils;
 import org.springframework.validation.annotation.Validated;
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Set;
@@ -26,9 +29,11 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private final SysUserService userService;
+    private final SocialStorageService socialStorageService;
 
-    public UserController(SysUserService userService) {
+    public UserController(SysUserService userService, SocialStorageService socialStorageService) {
         this.userService = userService;
+        this.socialStorageService = socialStorageService;
     }
 
     @GetMapping("/me")
@@ -65,12 +70,22 @@ public class UserController {
         return ApiResponse.success(UserResponse.from(userService.updateUser(id, request)));
     }
 
+    @PostMapping("/me/avatar")
+    public ApiResponse<UserResponse> uploadMyAvatar(@RequestParam("file") MultipartFile file) {
+        SysUser current = currentUser();
+        String avatarPath = socialStorageService.uploadImage(file).getPath();
+        UserRequest request = new UserRequest();
+        request.setAvatarPath(avatarPath);
+        SysUser updated = userService.updateUser(current.getId(), request);
+        return ApiResponse.success(UserResponse.from(updated));
+    }
+
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteUser(@PathVariable Long id) {
         requireRole("ADMIN");
         SysUser currentUser = currentUser();
         if (currentUser != null && currentUser.getId().equals(id)) {
-            throw new BusinessException("不能删除当前登录用户");
+            throw new BusinessException("操作失败");
         }
         userService.deleteUser(id);
         return ApiResponse.success();
@@ -79,7 +94,7 @@ public class UserController {
     private SysUser currentUser() {
         String username = (String) SecurityUtils.getSubject().getPrincipal();
         if (username == null) {
-            throw new BusinessException(401, "未登录");
+            throw new BusinessException(401, "请先登录");
         }
         return userService.getByUsername(username);
     }

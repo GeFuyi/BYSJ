@@ -19,7 +19,13 @@ public class JwtFilter extends AuthenticatingFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private static final List<String> WHITELIST_PREFIX = Arrays.asList("/api/auth/");
-    private static final List<String> WHITELIST_PATH = Arrays.asList("/api/health", "/error", "/api/repair/file", "/api/services/file");
+    private static final List<String> WHITELIST_PATH = Arrays.asList(
+            "/api/health",
+            "/error",
+            "/api/repair/file",
+            "/api/services/file",
+            "/api/electricity/notify"
+    );
 
     @Override
     protected AuthenticationToken createToken(ServletRequest request, ServletResponse response) {
@@ -67,7 +73,7 @@ public class JwtFilter extends AuthenticatingFilter {
             return true;
         } catch (Exception ex) {
             log.warn("JWT authenticate failed for path={}, error={}", ((HttpServletRequest) request).getRequestURI(), ex.getMessage(), ex);
-            writeUnauthorized((HttpServletResponse) response, "Token无效或已过期");
+            writeUnauthorized((HttpServletResponse) response, "登录状态已失效，请重新登录");
             return false;
         }
     }
@@ -82,7 +88,8 @@ public class JwtFilter extends AuthenticatingFilter {
         }
         res.setHeader("Access-Control-Allow-Credentials", "true");
         res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Authorization,Content-Type");
+        res.setHeader("Access-Control-Allow-Headers",
+                "Authorization,Content-Type,ngrok-skip-browser-warning,X-Requested-With");
         if (HttpMethod.OPTIONS.matches(req.getMethod())) {
             res.setStatus(HttpServletResponse.SC_OK);
             return true;

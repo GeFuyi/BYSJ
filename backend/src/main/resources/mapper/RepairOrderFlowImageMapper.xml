@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.community.mapper.RepairOrderFlowImageMapper">
+
+    <resultMap id="RepairOrderFlowImageResultMap" type="com.community.entity.RepairOrderFlowImage">
+        <id property="id" column="id"/>
+        <result property="flowId" column="flow_id"/>
+        <result property="imagePath" column="image_path"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <insert id="insertBatch">
+        INSERT INTO repair_order_flow_image (flow_id, image_path)
+        VALUES
+        <foreach collection="imagePaths" item="item" separator=",">
+            (#{flowId}, #{item})
+        </foreach>
+    </insert>
+
+    <select id="selectByFlowIds" resultMap="RepairOrderFlowImageResultMap">
+        SELECT id, flow_id, image_path, created_at
+        FROM repair_order_flow_image
+        WHERE flow_id IN
+        <foreach collection="flowIds" item="flowId" open="(" separator="," close=")">
+            #{flowId}
+        </foreach>
+        ORDER BY id ASC
+    </select>
+
+</mapper>
