@@ -31,10 +31,12 @@ import com.community.mapper.ServiceBookingMapper;
 import com.community.mapper.ServiceCategoryMapper;
 import com.community.mapper.ServiceImageMapper;
 import com.community.mapper.ServiceReviewMapper;
-import com.community.mapper.SysUserMapper;
 import com.community.service.ServicePlatformService;
+import com.community.service.SysUserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -49,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -64,6 +67,15 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_EMPLOYEE = "EMPLOYEE";
     private static final String ROLE_USER = "USER";
+    private static final String CATEGORY_LIST_KEY = "svc:category:list:enabled";
+    private static final String CATEGORY_KEY_PREFIX = "svc:category:code:";
+    private static final String PUBLISHED_VERSION_KEY = "svc:published:version";
+    private static final String PUBLISHED_LIST_KEY_PREFIX = "svc:published:list:";
+    private static final String DETAIL_PUBLIC_KEY_PREFIX = "svc:detail:public:";
+    private static final String DETAIL_AUDIT_KEY_PREFIX = "svc:detail:audit:";
+    private static final Duration CATEGORY_TTL = Duration.ofMinutes(30);
+    private static final Duration PUBLISHED_LIST_TTL = Duration.ofMinutes(5);
+    private static final Duration DETAIL_TTL = Duration.ofMinutes(5);
 
     private final ServicePlatformProperties properties;
     private final ServiceCategoryMapper categoryMapper;
@@ -72,7 +84,9 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     private final ServiceAuditLogMapper auditLogMapper;
     private final ServiceBookingMapper bookingMapper;
     private final ServiceReviewMapper reviewMapper;
-    private final SysUserMapper userMapper;
+    private final SysUserService sysUserService;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public ServicePlatformServiceImpl(ServicePlatformProperties properties,
                                       ServiceCategoryMapper categoryMapper,
@@ -81,7 +95,9 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
                                       ServiceAuditLogMapper auditLogMapper,
                                       ServiceBookingMapper bookingMapper,
                                       ServiceReviewMapper reviewMapper,
-                                      SysUserMapper userMapper) {
+                                      SysUserService sysUserService,
+                                      RedisTemplate<String, Object> redisTemplate,
+                                      ObjectMapper objectMapper) {
         this.properties = properties;
         this.categoryMapper = categoryMapper;
         this.serviceMapper = serviceMapper;
@@ -89,7 +105,9 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         this.auditLogMapper = auditLogMapper;
         this.bookingMapper = bookingMapper;
         this.reviewMapper = reviewMapper;
-        this.userMapper = userMapper;
+        this.sysUserService = sysUserService;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -131,13 +149,13 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
 
     @Override
     public List<ServiceCategoryResponse> listCategories() {
-        return categoryMapper.selectEnabled().stream().map(item -> {
-            ServiceCategoryResponse response = new ServiceCategoryResponse();
-            response.setCode(item.getCode());
-            response.setName(item.getName());
-            response.setSort(item.getSort());
-            return response;
-        }).collect(Collectors.toList());
+        Object cached = redisTemplate.opsForValue().get(CATEGORY_LIST_KEY);
+        if (cached != null) {
+            return convertToCategoryResponseList(cached);
+        }
+        List<ServiceCategoryResponse> categories = categoryMapper.selectEnabled().stream().map(this::toCategoryResponse).collect(Collectors.toList());
+        redisTemplate.opsForValue().set(CATEGORY_LIST_KEY, categories, CATEGORY_TTL);
+        return categories;
     }
 
     @Override
@@ -173,6 +191,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
                 serviceMapper.updateForResubmit(service);
             }
         }
+        invalidateServiceCaches(service.getId());
         return buildDetail(serviceMapper.selectById(service.getId()), currentUser, true);
     }
 
@@ -215,6 +234,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
                 serviceMapper.updateForResubmit(existing);
             }
         }
+        invalidateServiceCaches(id);
         return buildDetail(serviceMapper.selectById(id), currentUser, true);
     }
 
@@ -278,6 +298,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         log.setReviewerName(resolveDisplayName(currentUser));
         auditLogMapper.insert(log);
 
+        invalidateServiceCaches(id);
         return buildDetail(serviceMapper.selectById(id), currentUser, true);
     }
 
@@ -304,19 +325,29 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
             throw new BusinessException("操作失败");
         }
         serviceMapper.updateOperateStatus(id, targetStatus);
+        invalidateServiceCaches(id);
         return buildDetail(serviceMapper.selectById(id), currentUser, true);
     }
 
     @Override
     public List<ServiceListItemResponse> listPublishedServices(String keyword, String categoryCode, String serviceStatus) {
-        String safeKeyword = keyword == null ? null : keyword.trim();
-        String safeCategoryCode = categoryCode == null ? null : categoryCode.trim();
+        String safeKeyword = normalizeKeyword(keyword);
+        String safeCategoryCode = normalizeCategoryCode(categoryCode);
         if (StringUtils.hasText(safeCategoryCode)) {
             validateCategory(safeCategoryCode);
         }
         String normalizedServiceStatus = normalizeServiceStatus(serviceStatus);
-        List<ConvenienceService> services = serviceMapper.selectPublishedList(safeKeyword, safeCategoryCode, normalizedServiceStatus);
-        return services.stream().map(this::toListItem).collect(Collectors.toList());
+        String cacheKey = publishedListKey(currentPublishedVersion(), normalizedServiceStatus, safeCategoryCode, safeKeyword);
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            return convertToServiceListItemResponseList(cached);
+        }
+        List<ServiceListItemResponse> responses = serviceMapper.selectPublishedList(safeKeyword, safeCategoryCode, normalizedServiceStatus)
+                .stream()
+                .map(this::toListItem)
+                .collect(Collectors.toList());
+        redisTemplate.opsForValue().set(cacheKey, responses, PUBLISHED_LIST_TTL);
+        return responses;
     }
 
     @Override
@@ -329,7 +360,14 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         if (!ServiceAuditStatus.APPROVED.name().equals(service.getAuditStatus()) && !canViewAuditDetails) {
             throw new BusinessException(403, "无权限访问");
         }
-        return buildDetail(service, currentUser, canViewAuditDetails);
+        String cacheKey = canViewAuditDetails ? detailAuditKey(id) : detailPublicKey(id);
+        Object cached = redisTemplate.opsForValue().get(cacheKey);
+        if (cached != null) {
+            return objectMapper.convertValue(cached, ServiceDetailResponse.class);
+        }
+        ServiceDetailResponse detail = buildDetail(service, currentUser, canViewAuditDetails);
+        redisTemplate.opsForValue().set(cacheKey, detail, DETAIL_TTL);
+        return detail;
     }
 
     @Override
@@ -365,6 +403,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
             throw new BusinessException("操作失败");
         }
 
+        invalidateServiceCaches(serviceId);
         return toBookingResponse(booking, service);
     }
 
@@ -408,6 +447,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         review.setReviewerName(resolveDisplayName(currentUser));
         reviewMapper.insert(review);
         serviceMapper.refreshScore(serviceId);
+        invalidateServiceCaches(serviceId);
         return toReviewResponse(review);
     }
 
@@ -463,8 +503,8 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private void copyBase(ServiceListItemResponse response, ConvenienceService service) {
-        SysUser provider = userMapper.selectById(service.getProviderId());
-        ServiceCategory category = categoryMapper.selectByCode(service.getCategoryCode());
+        SysUser provider = service.getProviderId() == null ? null : loadUser(service.getProviderId());
+        ServiceCategory category = loadCategory(service.getCategoryCode());
 
         response.setId(service.getId());
         response.setProviderId(service.getProviderId());
@@ -491,7 +531,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private ServiceBookingResponse toBookingResponse(ServiceBooking booking, ConvenienceService service) {
-        SysUser bookingUser = userMapper.selectById(booking.getUserId());
+        SysUser bookingUser = booking.getUserId() == null ? null : loadUser(booking.getUserId());
         ServiceBookingResponse response = new ServiceBookingResponse();
         response.setId(booking.getId());
         response.setServiceId(booking.getServiceId());
@@ -509,7 +549,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private ServiceReviewResponse toReviewResponse(ServiceReview review) {
-        SysUser reviewUser = userMapper.selectById(review.getUserId());
+        SysUser reviewUser = review.getUserId() == null ? null : loadUser(review.getUserId());
         ServiceReviewResponse response = new ServiceReviewResponse();
         response.setId(review.getId());
         response.setServiceId(review.getServiceId());
@@ -523,7 +563,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     }
 
     private ServiceAuditLogResponse toAuditLogResponse(ServiceAuditLog log) {
-        SysUser reviewer = log.getReviewerId() == null ? null : userMapper.selectById(log.getReviewerId());
+        SysUser reviewer = log.getReviewerId() == null ? null : loadUser(log.getReviewerId());
         ServiceAuditLogResponse response = new ServiceAuditLogResponse();
         response.setId(log.getId());
         response.setFromAuditStatus(log.getFromAuditStatus());
@@ -537,6 +577,120 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         response.setReviewerAvatarPath(reviewer == null ? null : reviewer.getAvatarPath());
         response.setCreatedAt(log.getCreatedAt());
         return response;
+    }
+
+    private ServiceCategoryResponse toCategoryResponse(ServiceCategory category) {
+        ServiceCategoryResponse response = new ServiceCategoryResponse();
+        response.setCode(category.getCode());
+        response.setName(category.getName());
+        response.setSort(category.getSort());
+        return response;
+    }
+
+    private SysUser loadUser(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        try {
+            return sysUserService.getUserById(userId);
+        } catch (BusinessException ex) {
+            return null;
+        }
+    }
+
+    private ServiceCategory loadCategory(String categoryCode) {
+        if (!StringUtils.hasText(categoryCode)) {
+            return null;
+        }
+        String key = categoryKey(categoryCode.trim());
+        Object cached = redisTemplate.opsForValue().get(key);
+        if (cached != null) {
+            return objectMapper.convertValue(cached, ServiceCategory.class);
+        }
+        ServiceCategory category = categoryMapper.selectByCode(categoryCode.trim());
+        if (category != null) {
+            redisTemplate.opsForValue().set(key, category, CATEGORY_TTL);
+        }
+        return category;
+    }
+
+    private List<ServiceCategoryResponse> convertToCategoryResponseList(Object cached) {
+        return convertList(cached, ServiceCategoryResponse.class);
+    }
+
+    private List<ServiceListItemResponse> convertToServiceListItemResponseList(Object cached) {
+        return convertList(cached, ServiceListItemResponse.class);
+    }
+
+    private <T> List<T> convertList(Object cached, Class<T> itemClass) {
+        List<?> rawList = objectMapper.convertValue(cached, List.class);
+        List<T> result = new ArrayList<>();
+        for (Object item : rawList) {
+            result.add(objectMapper.convertValue(item, itemClass));
+        }
+        return result;
+    }
+
+    private void invalidateServiceCaches(Long serviceId) {
+        incrementPublishedVersion();
+        if (serviceId == null) {
+            return;
+        }
+        redisTemplate.delete(detailPublicKey(serviceId));
+        redisTemplate.delete(detailAuditKey(serviceId));
+    }
+
+    private long currentPublishedVersion() {
+        Object cached = redisTemplate.opsForValue().get(PUBLISHED_VERSION_KEY);
+        if (cached instanceof Number) {
+            return ((Number) cached).longValue();
+        }
+        if (cached != null) {
+            Long value = objectMapper.convertValue(cached, Long.class);
+            if (value != null && value > 0) {
+                return value;
+            }
+        }
+        redisTemplate.opsForValue().set(PUBLISHED_VERSION_KEY, 1L);
+        return 1L;
+    }
+
+    private void incrementPublishedVersion() {
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(PUBLISHED_VERSION_KEY))) {
+            redisTemplate.opsForValue().set(PUBLISHED_VERSION_KEY, 1L);
+        }
+        redisTemplate.opsForValue().increment(PUBLISHED_VERSION_KEY);
+    }
+
+    private String publishedListKey(long version, String serviceStatus, String categoryCode, String keyword) {
+        return PUBLISHED_LIST_KEY_PREFIX + "v" + version + ":"
+                + (StringUtils.hasText(serviceStatus) ? serviceStatus : "all") + ":"
+                + (StringUtils.hasText(categoryCode) ? categoryCode : "all") + ":"
+                + keywordHash(keyword);
+    }
+
+    private String detailPublicKey(Long serviceId) {
+        return DETAIL_PUBLIC_KEY_PREFIX + serviceId;
+    }
+
+    private String detailAuditKey(Long serviceId) {
+        return DETAIL_AUDIT_KEY_PREFIX + serviceId;
+    }
+
+    private String categoryKey(String categoryCode) {
+        return CATEGORY_KEY_PREFIX + categoryCode;
+    }
+
+    private String normalizeKeyword(String keyword) {
+        return StringUtils.hasText(keyword) ? keyword.trim() : null;
+    }
+
+    private String normalizeCategoryCode(String categoryCode) {
+        return StringUtils.hasText(categoryCode) ? categoryCode.trim() : null;
+    }
+
+    private String keywordHash(String keyword) {
+        return StringUtils.hasText(keyword) ? Integer.toHexString(keyword.hashCode()) : "all";
     }
 
     private String serviceStatusLabel(String code) {
@@ -604,7 +758,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         if (!StringUtils.hasText(categoryCode)) {
             throw new BusinessException("操作失败");
         }
-        ServiceCategory category = categoryMapper.selectByCode(categoryCode.trim());
+        ServiceCategory category = loadCategory(categoryCode);
         if (category == null || category.getStatus() == null || category.getStatus() != 1) {
             throw new BusinessException("操作失败");
         }

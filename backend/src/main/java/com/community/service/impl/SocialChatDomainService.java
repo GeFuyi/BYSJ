@@ -30,12 +30,15 @@ import com.community.mapper.SocialCommentImageMapper;
 import com.community.mapper.SocialCommentMapper;
 import com.community.mapper.SocialPostImageMapper;
 import com.community.mapper.SocialPostMapper;
-import com.community.mapper.SysUserMapper;
+import com.community.service.SysUserService;
 import com.community.ws.WsSessionRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +62,15 @@ public class SocialChatDomainService {
     private static final String FRIEND_REQUEST_PENDING = "PENDING";
     private static final String FRIEND_REQUEST_ACCEPTED = "ACCEPTED";
     private static final String FRIEND_REQUEST_REJECTED = "REJECTED";
+    private static final String FEED_VERSION_KEY = "social:feed:version";
+    private static final String FEED_LIST_KEY_PREFIX = "social:feed:list:";
+    private static final String POST_COMMENTS_KEY_PREFIX = "social:post:comments:";
+    private static final String FRIEND_LIST_KEY_PREFIX = "social:friends:";
+    private static final String FRIEND_REQUEST_LIST_KEY_PREFIX = "social:friend-requests:";
+    private static final Duration FEED_TTL = Duration.ofSeconds(60);
+    private static final Duration COMMENTS_TTL = Duration.ofSeconds(60);
+    private static final Duration FRIENDS_TTL = Duration.ofMinutes(2);
+    private static final Duration FRIEND_REQUESTS_TTL = Duration.ofMinutes(2);
 
     private final SocialPostMapper postMapper;
     private final SocialPostImageMapper postImageMapper;
@@ -70,7 +82,9 @@ public class SocialChatDomainService {
     private final ChatGroupMemberMapper chatGroupMemberMapper;
     private final ChatGroupAnnouncementAckMapper groupAnnouncementAckMapper;
     private final ChatMessageMapper chatMessageMapper;
-    private final SysUserMapper userMapper;
+    private final SysUserService sysUserService;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final ObjectMapper objectMapper;
     private final WsSessionRegistry sessionRegistry;
 
     public SocialChatDomainService(SocialPostMapper postMapper,
@@ -83,7 +97,9 @@ public class SocialChatDomainService {
                                    ChatGroupMemberMapper chatGroupMemberMapper,
                                    ChatGroupAnnouncementAckMapper groupAnnouncementAckMapper,
                                    ChatMessageMapper chatMessageMapper,
-                                   SysUserMapper userMapper,
+                                   SysUserService sysUserService,
+                                   RedisTemplate<String, Object> redisTemplate,
+                                   ObjectMapper objectMapper,
                                    WsSessionRegistry sessionRegistry) {
         this.postMapper = postMapper;
         this.postImageMapper = postImageMapper;
@@ -95,7 +111,9 @@ public class SocialChatDomainService {
         this.chatGroupMemberMapper = chatGroupMemberMapper;
         this.groupAnnouncementAckMapper = groupAnnouncementAckMapper;
         this.chatMessageMapper = chatMessageMapper;
-        this.userMapper = userMapper;
+        this.sysUserService = sysUserService;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
         this.sessionRegistry = sessionRegistry;
     }
 
@@ -113,12 +131,20 @@ public class SocialChatDomainService {
         if (!sanitizedImages.isEmpty()) {
             postImageMapper.insertBatch(post.getId(), sanitizedImages);
         }
-        return buildPostResponse(postMapper.selectById(post.getId()), user);
+        incrementFeedVersion();
+        SocialPost saved = postMapper.selectById(post.getId());
+        return buildPostResponse(saved, user, sanitizedImages, new ArrayList<>());
     }
 
     public List<WsSocialPostResponse> listFeed(Long currentUserId, Long beforeId, Integer limit) {
         requireActiveUser(currentUserId);
         int safeLimit = limit == null ? 20 : Math.max(1, Math.min(50, limit));
+        String cacheKey = feedKey(currentFeedVersion(), beforeId, safeLimit);
+        Object cached = getCache(cacheKey);
+        if (cached != null) {
+            return convertList(cached, WsSocialPostResponse.class);
+        }
+
         List<SocialPost> posts = postMapper.selectFeed(beforeId, safeLimit);
         if (posts.isEmpty()) {
             return new ArrayList<>();
@@ -132,11 +158,14 @@ public class SocialChatDomainService {
         List<WsSocialPostResponse> responses = new ArrayList<>();
         for (SocialPost post : posts) {
             SysUser owner = userMap.get(post.getUserId());
-            WsSocialPostResponse response = buildPostResponse(post, owner);
-            response.setImagePaths(postImages.getOrDefault(post.getId(), new ArrayList<>()));
-            response.setComments(commentMap.getOrDefault(post.getId(), new ArrayList<>()));
-            responses.add(response);
+            responses.add(buildPostResponse(
+                    post,
+                    owner,
+                    postImages.getOrDefault(post.getId(), new ArrayList<>()),
+                    commentMap.getOrDefault(post.getId(), new ArrayList<>())
+            ));
         }
+        putCache(cacheKey, responses, FEED_TTL);
         return responses;
     }
 
@@ -172,8 +201,11 @@ public class SocialChatDomainService {
         if (!sanitizedImages.isEmpty()) {
             commentImageMapper.insertBatch(comment.getId(), sanitizedImages);
         }
-        SysUser replyToUser = parent == null ? null : userMapper.selectById(parent.getUserId());
-        return buildCommentResponse(commentMapper.selectById(comment.getId()), user, replyToUser);
+        SysUser replyToUser = parent == null ? null : loadUser(parent.getUserId());
+        evictCommentsCache(postId);
+        incrementFeedVersion();
+        SocialComment saved = commentMapper.selectById(comment.getId());
+        return buildCommentResponse(saved, user, replyToUser, sanitizedImages);
     }
 
     public List<WsSocialCommentResponse> listComments(Long currentUserId, Long postId) {
@@ -182,7 +214,13 @@ public class SocialChatDomainService {
         if (post == null) {
             throw new BusinessException(404, "资源不存在");
         }
-        return commentsOfPost(postId);
+        Object cached = getCache(commentsKey(postId));
+        if (cached != null) {
+            return convertList(cached, WsSocialCommentResponse.class);
+        }
+        List<WsSocialCommentResponse> comments = commentsOfPost(postId);
+        putCache(commentsKey(postId), comments, COMMENTS_TTL);
+        return comments;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -206,6 +244,9 @@ public class SocialChatDomainService {
         FriendRequest reversePending = friendRequestMapper.selectPending(friendUserId, userId);
         if (reversePending != null) {
             handleFriendRequestInternal(currentUser, reversePending, "ACCEPT");
+            evictFriendRequestCache(userId);
+            evictFriendListCache(userId);
+            evictFriendListCache(friendUserId);
             WsFriendAddResult result = new WsFriendAddResult();
             result.setMode("DIRECT");
             result.setFriend(toFriendResponse(friendRelationMapper.selectByUserAndFriend(userId, friendUserId), friend));
@@ -215,6 +256,8 @@ public class SocialChatDomainService {
         if (ROLE_ADMIN.equals(currentUser.getRole())) {
             ensureFriendRelation(userId, friendUserId);
             ensureFriendRelation(friendUserId, userId);
+            evictFriendListCache(userId);
+            evictFriendListCache(friendUserId);
             WsFriendAddResult result = new WsFriendAddResult();
             result.setMode("DIRECT");
             result.setFriend(toFriendResponse(friendRelationMapper.selectByUserAndFriend(userId, friendUserId), friend));
@@ -235,6 +278,7 @@ public class SocialChatDomainService {
         request.setStatus(FRIEND_REQUEST_PENDING);
         request.setMessage(StringUtils.hasText(message) ? message.trim() : null);
         friendRequestMapper.insert(request);
+        evictFriendRequestCache(friendUserId);
 
         WsFriendAddResult result = new WsFriendAddResult();
         result.setMode("PENDING");
@@ -244,6 +288,10 @@ public class SocialChatDomainService {
 
     public List<WsFriendRequestResponse> listFriendRequests(Long userId) {
         SysUser current = requireActiveUser(userId);
+        Object cached = getCache(friendRequestListKey(current.getId()));
+        if (cached != null) {
+            return convertList(cached, WsFriendRequestResponse.class);
+        }
         List<FriendRequest> requests = friendRequestMapper.selectPendingByTarget(current.getId());
         if (requests.isEmpty()) {
             return new ArrayList<>();
@@ -254,9 +302,11 @@ public class SocialChatDomainService {
             userIds.add(request.getTargetUserId());
         }
         Map<Long, SysUser> userMap = loadUsers(new ArrayList<>(userIds));
-        return requests.stream()
+        List<WsFriendRequestResponse> responses = requests.stream()
                 .map(item -> toFriendRequestResponse(item, userMap.get(item.getRequesterId()), userMap.get(item.getTargetUserId())))
                 .collect(Collectors.toList());
+        putCache(friendRequestListKey(current.getId()), responses, FRIEND_REQUESTS_TTL);
+        return responses;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -277,8 +327,13 @@ public class SocialChatDomainService {
         handleFriendRequestInternal(current, request, normalizedAction);
 
         FriendRequest refreshed = friendRequestMapper.selectById(requestId);
-        SysUser requester = userMapper.selectById(refreshed.getRequesterId());
-        SysUser target = userMapper.selectById(refreshed.getTargetUserId());
+        evictFriendRequestCache(refreshed.getTargetUserId());
+        if (FRIEND_REQUEST_ACCEPTED.equals(refreshed.getStatus())) {
+            evictFriendListCache(refreshed.getRequesterId());
+            evictFriendListCache(refreshed.getTargetUserId());
+        }
+        SysUser requester = loadUser(refreshed.getRequesterId());
+        SysUser target = loadUser(refreshed.getTargetUserId());
         return toFriendRequestResponse(refreshed, requester, target);
     }
 
@@ -288,10 +343,16 @@ public class SocialChatDomainService {
         requireActiveUser(friendUserId);
         friendRelationMapper.deleteByUserAndFriend(userId, friendUserId);
         friendRelationMapper.deleteByUserAndFriend(friendUserId, userId);
+        evictFriendListCache(userId);
+        evictFriendListCache(friendUserId);
     }
 
     public List<WsFriendResponse> listFriends(Long userId) {
         requireActiveUser(userId);
+        Object cached = getCache(friendListKey(userId));
+        if (cached != null) {
+            return applyOnlineStatus(convertList(cached, WsFriendResponse.class));
+        }
         List<FriendRelation> relations = friendRelationMapper.selectByUserId(userId);
         if (relations.isEmpty()) {
             return new ArrayList<>();
@@ -304,12 +365,13 @@ public class SocialChatDomainService {
                 result.add(toFriendResponse(relation, friend));
             }
         }
-        return result;
+        putCache(friendListKey(userId), result, FRIENDS_TTL);
+        return applyOnlineStatus(result);
     }
 
     public List<WsUserBriefResponse> listUserDirectory(Long currentUserId) {
         requireActiveUser(currentUserId);
-        List<SysUser> users = userMapper.selectAll();
+        List<SysUser> users = sysUserService.listUsers();
         List<WsUserBriefResponse> list = new ArrayList<>();
         for (SysUser user : users) {
             if (user == null || user.getStatus() == null || user.getStatus() != 1 || currentUserId.equals(user.getId())) {
@@ -323,7 +385,7 @@ public class SocialChatDomainService {
     @Transactional(rollbackFor = Exception.class)
     public WsGroupResponse createGroup(Long ownerId, String name, List<Long> memberIds) {
         requireActiveUser(ownerId);
-        String groupName = StringUtils.hasText(name) ? name.trim() : null;
+        String groupName = StringUtils.hasText(name) ? name.trim() : "";
         if (!StringUtils.hasText(groupName)) {
             throw new BusinessException(400, "请求参数不合法");
         }
@@ -697,7 +759,7 @@ public class SocialChatDomainService {
         return brief;
     }
 
-    private WsSocialPostResponse buildPostResponse(SocialPost post, SysUser owner) {
+    private WsSocialPostResponse buildPostResponse(SocialPost post, SysUser owner, List<String> imagePaths, List<WsSocialCommentResponse> comments) {
         WsSocialPostResponse response = new WsSocialPostResponse();
         response.setId(post.getId());
         response.setUserId(post.getUserId());
@@ -706,10 +768,8 @@ public class SocialChatDomainService {
         response.setAvatarPath(owner == null ? null : owner.getAvatarPath());
         response.setContent(post.getContent());
         response.setCreatedAt(post.getCreatedAt());
-        response.setImagePaths(postImageMapper.selectByPostId(post.getId()).stream()
-                .map(SocialPostImage::getImagePath)
-                .collect(Collectors.toList()));
-        response.setComments(commentsOfPost(post.getId()));
+        response.setImagePaths(imagePaths);
+        response.setComments(comments);
         return response;
     }
 
@@ -733,9 +793,7 @@ public class SocialChatDomainService {
         for (SocialComment comment : comments) {
             SysUser user = userMap.get(comment.getUserId());
             SysUser replyTo = comment.getReplyToUserId() == null ? null : userMap.get(comment.getReplyToUserId());
-            WsSocialCommentResponse response = buildCommentResponse(comment, user, replyTo);
-            response.setImagePaths(commentImages.getOrDefault(comment.getId(), new ArrayList<>()));
-            responses.add(response);
+            responses.add(buildCommentResponse(comment, user, replyTo, commentImages.getOrDefault(comment.getId(), new ArrayList<>())));
         }
         return responses;
     }
@@ -748,7 +806,7 @@ public class SocialChatDomainService {
         return result;
     }
 
-    private WsSocialCommentResponse buildCommentResponse(SocialComment comment, SysUser user, SysUser replyTo) {
+    private WsSocialCommentResponse buildCommentResponse(SocialComment comment, SysUser user, SysUser replyTo, List<String> imagePaths) {
         WsSocialCommentResponse response = new WsSocialCommentResponse();
         response.setId(comment.getId());
         response.setPostId(comment.getPostId());
@@ -760,9 +818,7 @@ public class SocialChatDomainService {
         response.setReplyToNickname(replyTo == null ? null : resolveNickname(replyTo));
         response.setReplyToAvatarPath(replyTo == null ? null : replyTo.getAvatarPath());
         response.setContent(comment.getContent());
-        response.setImagePaths(commentImageMapper.selectByCommentId(comment.getId()).stream()
-                .map(SocialCommentImage::getImagePath)
-                .collect(Collectors.toList()));
+        response.setImagePaths(imagePaths);
         response.setCreatedAt(comment.getCreatedAt());
         return response;
     }
@@ -804,7 +860,7 @@ public class SocialChatDomainService {
             if (userId == null) {
                 continue;
             }
-            SysUser user = userMapper.selectById(userId);
+            SysUser user = loadUser(userId);
             if (user != null) {
                 map.put(userId, user);
             }
@@ -812,11 +868,113 @@ public class SocialChatDomainService {
         return map;
     }
 
+    private SysUser loadUser(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        try {
+            return sysUserService.getUserById(userId);
+        } catch (BusinessException ex) {
+            return null;
+        }
+    }
+
+    private <T> List<T> convertList(Object cached, Class<T> itemClass) {
+        List<?> rawList = objectMapper.convertValue(cached, List.class);
+        List<T> result = new ArrayList<>();
+        for (Object item : rawList) {
+            result.add(objectMapper.convertValue(item, itemClass));
+        }
+        return result;
+    }
+
+    private Object getCache(String key) {
+        if (key == null) {
+            return null;
+        }
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    private void putCache(String key, Object value, Duration ttl) {
+        if (key == null || value == null || ttl == null) {
+            return;
+        }
+        redisTemplate.opsForValue().set(key, value, ttl);
+    }
+
+    private long currentFeedVersion() {
+        Object cached = redisTemplate.opsForValue().get(FEED_VERSION_KEY);
+        if (cached instanceof Number) {
+            return ((Number) cached).longValue();
+        }
+        if (cached != null) {
+            Long value = objectMapper.convertValue(cached, Long.class);
+            if (value != null && value > 0) {
+                return value;
+            }
+        }
+        redisTemplate.opsForValue().set(FEED_VERSION_KEY, 1L);
+        return 1L;
+    }
+
+    private void incrementFeedVersion() {
+        if (Boolean.FALSE.equals(redisTemplate.hasKey(FEED_VERSION_KEY))) {
+            redisTemplate.opsForValue().set(FEED_VERSION_KEY, 1L);
+        }
+        redisTemplate.opsForValue().increment(FEED_VERSION_KEY);
+    }
+
+    private String feedKey(long version, Long beforeId, int limit) {
+        return FEED_LIST_KEY_PREFIX + "v" + version + ":" + (beforeId == null ? "latest" : beforeId) + ":" + limit;
+    }
+
+    private String commentsKey(Long postId) {
+        return POST_COMMENTS_KEY_PREFIX + postId;
+    }
+
+    private void evictCommentsCache(Long postId) {
+        if (postId != null) {
+            redisTemplate.delete(commentsKey(postId));
+        }
+    }
+
+    private String friendListKey(Long userId) {
+        return FRIEND_LIST_KEY_PREFIX + userId;
+    }
+
+    private String friendRequestListKey(Long userId) {
+        return FRIEND_REQUEST_LIST_KEY_PREFIX + userId;
+    }
+
+    private void evictFriendListCache(Long userId) {
+        if (userId != null) {
+            redisTemplate.delete(friendListKey(userId));
+        }
+    }
+
+    private void evictFriendRequestCache(Long userId) {
+        if (userId != null) {
+            redisTemplate.delete(friendRequestListKey(userId));
+        }
+    }
+
+    private List<WsFriendResponse> applyOnlineStatus(List<WsFriendResponse> friends) {
+        if (friends == null || friends.isEmpty()) {
+            return friends == null ? new ArrayList<>() : friends;
+        }
+        for (WsFriendResponse friend : friends) {
+            if (friend != null && friend.getUserId() != null) {
+                friend.setOnline(sessionRegistry.isOnline(friend.getUserId()));
+            }
+        }
+        return friends;
+    }
+
     private SysUser requireActiveUser(Long userId) {
         if (userId == null || userId <= 0) {
             throw new BusinessException(400, "请求参数不合法");
         }
-        SysUser user = userMapper.selectById(userId);
+        SysUser user = loadUser(userId);
         if (user == null) {
             throw new BusinessException(404, "资源不存在");
         }
