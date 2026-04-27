@@ -4,6 +4,16 @@ export function getMe() {
   return request.get("/users/me");
 }
 
+export function uploadMyAvatar(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request.post("/users/me/avatar", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data"
+    }
+  });
+}
+
 export function listUsers() {
   return request.get("/users");
 }

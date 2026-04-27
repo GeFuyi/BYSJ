@@ -179,6 +179,7 @@ import {
   createRepairOrder,
   getRepairOrderDetail,
   listRepairOrders,
+  repairImageUrl,
   updateRepairOrderStatus,
   uploadRepairImage
 } from "../api/repair";
@@ -367,7 +368,7 @@ function statusTagType(status) {
 }
 
 function fileUrl(path) {
-  return `/api/repair/file?path=${encodeURIComponent(path)}`;
+  return repairImageUrl(path);
 }
 </script>
 

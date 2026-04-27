@@ -8,6 +8,10 @@ export function uploadRepairImage(formData) {
   });
 }
 
+export function repairImageUrl(path) {
+  return `/api/repair/file?path=${encodeURIComponent(path)}`;
+}
+
 export function createRepairOrder(data) {
   return request.post("/repair/orders", data);
 }

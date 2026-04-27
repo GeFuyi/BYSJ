@@ -441,6 +441,14 @@ function handleWsMessage(message) {
   handleEvent(message);
 }
 
+//建立 WebSocket 连接的函数 connect()，包含以下逻辑：
+//1. 获取 token，如果没有，直接返回，不连接。
+//2. 如果已经有连接正在打开或已打开，直接返回，避免重复连接。
+//3. 设置应用状态监听器，确保在原生平台上能正确处理前后台切换。
+//4. 确保通知权限，适配原生平台的消息通知需求。
+//5. 重置手动关闭标志和重连定时器，准备建立新连接。
+//6. 创建新的 WebSocket 实例，连接到服务器，并附带 token 作为查询参数。
+//7. 定义 WebSocket 的 onopen、onmessage 和 onclose 事件处理函数，处理连接成功、接收消息和连接关闭的逻辑。
 function connect() {
   const token = getToken();
   if (!token) return;
@@ -460,6 +468,12 @@ function connect() {
     connected.value = true;
     startPing();
     try {
+      // 发送 "INIT" 消息到服务器获取初始化数据。
+      // 将返回数据存入响应式变量：
+      // feed：动态消息或通知。
+      // friends：好友列表。
+      // friendRequests：好友请求。
+      // groups：群组列表
       const init = await sendWs("INIT");
       feed.value = normalizeArray(init?.feed);
       friends.value = normalizeArray(init?.friends);

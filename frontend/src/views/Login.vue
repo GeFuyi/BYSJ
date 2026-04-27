@@ -87,6 +87,7 @@ let timer = null;
 function saveLogin(res) {
   sessionStorage.setItem("token", res.token);
   sessionStorage.setItem("userInfo", JSON.stringify(res.user));
+  window.dispatchEvent(new Event("user-info-updated"));
   ElMessage.success("登录成功");
   router.push("/home/dashboard");
 }

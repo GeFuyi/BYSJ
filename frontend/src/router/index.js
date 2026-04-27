@@ -9,7 +9,10 @@ import ServiceMarket from "../views/ServiceMarket.vue";
 import ServiceProvider from "../views/ServiceProvider.vue";
 import ServiceAudit from "../views/ServiceAudit.vue";
 import ElectricityPayment from "../views/ElectricityPayment.vue";
-import SocialHub from "../views/SocialHub.vue";
+import Moments from "../views/Moments.vue";
+import Chats from "../views/Chats.vue";
+import ChatRoom from "../views/ChatRoom.vue";
+import Profile from "../views/Profile.vue";
 
 const routes = [
   {
@@ -31,35 +34,62 @@ const routes = [
     children: [
       {
         path: "dashboard",
-        component: Dashboard
+        component: Dashboard,
+        meta: { title: "首页" }
       },
       {
         path: "services",
-        component: ServiceMarket
+        component: ServiceMarket,
+        meta: { title: "便民服务" }
       },
       {
         path: "service-provider",
-        component: ServiceProvider
+        component: ServiceProvider,
+        meta: { title: "服务入驻" }
       },
       {
         path: "service-audit",
-        component: ServiceAudit
+        component: ServiceAudit,
+        meta: { title: "入驻审核" }
       },
       {
         path: "repair",
-        component: RepairOrder
+        component: RepairOrder,
+        meta: { title: "物业报修" }
       },
       {
         path: "electricity",
-        component: ElectricityPayment
+        component: ElectricityPayment,
+        meta: { title: "电费代缴" }
       },
       {
         path: "social",
-        component: SocialHub
+        redirect: "/home/moments"
+      },
+      {
+        path: "moments",
+        component: Moments,
+        meta: { title: "邻里圈" }
+      },
+      {
+        path: "chats",
+        component: Chats,
+        meta: { title: "聊天" }
+      },
+      {
+        path: "chat/:chatType/:targetId",
+        component: ChatRoom,
+        meta: { title: "聊天室" }
+      },
+      {
+        path: "profile",
+        component: Profile,
+        meta: { title: "我的" }
       },
       {
         path: "users",
-        component: UserManagement
+        component: UserManagement,
+        meta: { title: "人员管理" }
       }
     ]
   }
