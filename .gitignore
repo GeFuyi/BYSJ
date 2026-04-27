@@ -74,3 +74,5 @@ backend/uploads/
 backend/temp/
 uploads/
 temp/
+
+word/generate_word_templates.py
