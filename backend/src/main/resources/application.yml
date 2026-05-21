@@ -37,11 +37,11 @@ sms:
   access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
   region: ap-southeast-1
   endpoint: dypnsapi.aliyuncs.com
-  scheme-name: ${SMS_SCHEME_NAME:TestScheme}
+  scheme-name: ${SMS_SCHEME_NAME:测试方案}
   default-country-code: "86"
   default-phone-number: "15138114047"
-  sign-name: ${SMS_SIGN_NAME:}
-  template-code: ${SMS_TEMPLATE_CODE:}
+  sign-name: ${SMS_SIGN_NAME:速通互联验证码}
+  template-code: ${SMS_TEMPLATE_CODE:100001}
   template-param: '{"code":"##code##","min":"5"}'
   sms-up-extend-code: ""
   code-length: 6

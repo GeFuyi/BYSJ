@@ -153,6 +153,7 @@ public class AliyunSmsGateway {
             return new BusinessException(500,
                     action + "：未找到可用的阿里云凭证，请检查运行环境凭证或 application.yml 配置。");
         }
+        log.warn("{}: {}", action, message);
         return new BusinessException(502, action + "，第三方短信服务调用失败");
     }
 }
