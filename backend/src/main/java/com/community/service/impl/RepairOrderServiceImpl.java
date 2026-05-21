@@ -138,7 +138,7 @@ public class RepairOrderServiceImpl implements RepairOrderService {
         flow.setOrderId(order.getId());
         flow.setFromStatus("INIT");
         flow.setToStatus(RepairOrderStatus.SUBMITTED.name());
-        flow.setRemark("Order submitted");
+        flow.setRemark("用户提交报修工单");
         flow.setOperatorId(currentUser.getId());
         flow.setOperatorName(resolveUserName(currentUser));
         flow.setOperatorRole(currentUser.getRole());
@@ -304,13 +304,13 @@ public class RepairOrderServiceImpl implements RepairOrderService {
         response.setId(flow.getId());
         response.setFromStatus(flow.getFromStatus());
         response.setToStatus(flow.getToStatus());
-        response.setFromStatusLabel("INIT".equals(flow.getFromStatus()) ? "INIT" : safeStatusLabel(flow.getFromStatus()));
+        response.setFromStatusLabel("INIT".equals(flow.getFromStatus()) ? "初始" : safeStatusLabel(flow.getFromStatus()));
         response.setToStatusLabel(safeStatusLabel(flow.getToStatus()));
-        response.setRemark(flow.getRemark());
+        response.setRemark(localizeRemark(flow.getRemark()));
         response.setOperatorId(flow.getOperatorId());
         response.setOperatorName(flow.getOperatorName());
         response.setOperatorAvatarPath(operator == null ? null : operator.getAvatarPath());
-        response.setOperatorRole(flow.getOperatorRole());
+        response.setOperatorRole(roleLabel(flow.getOperatorRole()));
         response.setImagePaths(imagePaths);
         response.setCreatedAt(flow.getCreatedAt());
         return response;
@@ -379,8 +379,25 @@ public class RepairOrderServiceImpl implements RepairOrderService {
         return StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
     }
 
+    private String roleLabel(String role) {
+        if (ROLE_ADMIN.equals(role)) return "管理员";
+        if (ROLE_EMPLOYEE.equals(role)) return "员工";
+        if (ROLE_USER.equals(role)) return "住户";
+        return role;
+    }
+
+    private String localizeRemark(String remark) {
+        if (!StringUtils.hasText(remark)) return remark;
+        if ("Order submitted".equals(remark)) return "用户提交报修工单";
+        if (remark.startsWith("Status changed to: ")) {
+            String status = remark.substring("Status changed to: ".length());
+            return "状态变更为：" + status;
+        }
+        return remark;
+    }
+
     private String defaultRemark(String targetStatus) {
-        return "Status changed to: " + RepairOrderStatus.labelOf(targetStatus);
+        return "状态变更为：" + RepairOrderStatus.labelOf(targetStatus);
     }
 
     private String fileSuffix(String fileName) {

@@ -100,14 +100,14 @@ public class DatabaseMigrationRunner {
 
     private void seedServiceCategories() {
         try {
-            upsertServiceCategory("HOUSEKEEPING", "Housekeeping", 1);
-            upsertServiceCategory("HOME_REPAIR", "Home Repair", 2);
-            upsertServiceCategory("ELDER_CARE", "Elder Care", 3);
-            upsertServiceCategory("CHILD_CARE", "Child Care", 4);
-            upsertServiceCategory("PET_CARE", "Pet Care", 5);
-            upsertServiceCategory("ERRAND", "Errand", 6);
-            upsertServiceCategory("IT_SUPPORT", "IT Support", 7);
-            upsertServiceCategory("COMMUNITY_CLASS", "Community Class", 8);
+            upsertServiceCategory("HOUSEKEEPING", "家政服务", 1);
+            upsertServiceCategory("HOME_REPAIR", "上门维修", 2);
+            upsertServiceCategory("ELDER_CARE", "助老照护", 3);
+            upsertServiceCategory("CHILD_CARE", "儿童托管", 4);
+            upsertServiceCategory("PET_CARE", "宠物照看", 5);
+            upsertServiceCategory("ERRAND", "跑腿代办", 6);
+            upsertServiceCategory("IT_SUPPORT", "数码维修", 7);
+            upsertServiceCategory("COMMUNITY_CLASS", "社区课堂", 8);
         } catch (DataAccessException ex) {
             log.warn("database migration warning (init service_category data): {}", ex.getMessage());
         }

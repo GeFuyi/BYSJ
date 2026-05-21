@@ -570,7 +570,7 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
         response.setFromAuditStatusLabel(auditStatusLabel(log.getFromAuditStatus()));
         response.setToAuditStatus(log.getToAuditStatus());
         response.setToAuditStatusLabel(auditStatusLabel(log.getToAuditStatus()));
-        response.setAction(log.getAction());
+        response.setAction(auditActionLabel(log.getAction()));
         response.setReason(log.getReason());
         response.setReviewerId(log.getReviewerId());
         response.setReviewerName(log.getReviewerName());
@@ -704,6 +704,14 @@ public class ServicePlatformServiceImpl implements ServicePlatformService {
     private String auditStatusLabel(String code) {
         try {
             return ServiceAuditStatus.fromCode(code).getLabel();
+        } catch (Exception ex) {
+            return code;
+        }
+    }
+
+    private String auditActionLabel(String code) {
+        try {
+            return ServiceAuditAction.fromCode(code).getLabel();
         } catch (Exception ex) {
             return code;
         }
