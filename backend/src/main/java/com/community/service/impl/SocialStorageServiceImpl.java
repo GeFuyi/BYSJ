@@ -9,10 +9,10 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.UriUtils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -67,7 +67,7 @@ public class SocialStorageServiceImpl implements SocialStorageService {
         SocialImageUploadResponse response = new SocialImageUploadResponse();
         response.setPath(relativePath);
         response.setOriginalName(file.getOriginalFilename());
-        response.setUrl("/api/social/file?path=" + UriUtils.encodeQueryParam(relativePath, StandardCharsets.UTF_8));
+        response.setUrl("/api/social/file?path=" + URLEncoder.encode(relativePath, StandardCharsets.UTF_8));
         return response;
     }
 
