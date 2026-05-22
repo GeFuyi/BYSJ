@@ -24,6 +24,7 @@ public class JwtFilter extends AuthenticatingFilter {
             "/error",
             "/api/repair/file",
             "/api/services/file",
+            "/api/social/file",
             "/api/electricity/notify"
     );
 

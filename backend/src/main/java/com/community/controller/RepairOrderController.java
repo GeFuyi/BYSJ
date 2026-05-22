@@ -45,7 +45,7 @@ public class RepairOrderController {
         return ApiResponse.success(repairOrderService.uploadImage(file));
     }
 
-    @PostMapping("/orders")
+    @PostMapping(value = "/orders", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<RepairOrderDetailResponse> createOrder(@Validated @RequestBody RepairOrderCreateRequest request) {
         return ApiResponse.success(repairOrderService.createOrder(request, currentUser()));
     }
@@ -61,7 +61,7 @@ public class RepairOrderController {
         return ApiResponse.success(repairOrderService.getOrderDetail(id, currentUser()));
     }
 
-    @PutMapping("/orders/{id}/status")
+    @PutMapping(value = "/orders/{id}/status", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<RepairOrderDetailResponse> updateStatus(@PathVariable Long id,
                                                                @Validated @RequestBody RepairOrderStatusUpdateRequest request) {
         return ApiResponse.success(repairOrderService.updateStatus(id, request, currentUser()));

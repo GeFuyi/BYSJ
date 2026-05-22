@@ -85,7 +85,7 @@ public class UserController {
         requireRole("ADMIN");
         SysUser currentUser = currentUser();
         if (currentUser != null && currentUser.getId().equals(id)) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(409, "不能删除当前登录用户");
         }
         userService.deleteUser(id);
         return ApiResponse.success();

@@ -29,6 +29,40 @@ function shouldUseNgrokBypass(url, baseURL = configuredBase) {
   const target = toUrlObject(url, baseObj?.href || browserOrigin) || baseObj;
   return !!target && NGROK_HOST_RE.test(target.hostname);
 }
+const DEFAULT_MESSAGES = {
+  400: "请求参数不合法",
+  401: "请先登录",
+  403: "无权限访问",
+  404: "资源不存在",
+  409: "当前状态不允许操作",
+  415: "请求格式不支持",
+  500: "服务器内部错误"
+};
+
+function errorCategory(status) {
+  if (status === 400) return "validation";
+  if (status === 401) return "auth";
+  if (status === 403) return "permission";
+  if (status === 404) return "not_found";
+  if (status === 409) return "conflict";
+  if (status === 415) return "unsupported_media_type";
+  if (status >= 500) return "server";
+  return "unknown";
+}
+
+function attachApiError(error, { status, code, message }) {
+  const apiStatus = code && code !== 0 ? code : status;
+  const apiCode = code || status;
+  const apiMessage = message || DEFAULT_MESSAGES[apiStatus] || "网络异常";
+  const target = error instanceof Error ? error : new Error(apiMessage);
+  target.status = apiStatus;
+  target.apiCode = apiCode;
+  target.apiMessage = apiMessage;
+  target.category = errorCategory(apiStatus);
+  target.message = apiMessage;
+  return target;
+}
+
 //请求拦截器，添加 token 和 ngrok 绕过头
 request.interceptors.request.use((config) => {
   if (!config.headers) {
@@ -50,7 +84,10 @@ request.interceptors.response.use(
     //如果返回的是 HTML（通常是网关错误页或重定向页），直接 reject 并提示开发者检查 Ngrok 配置
     //防止后端返回 HTML 页面而前端当 JSON 处理导致错误
     if (contentType.includes("text/html")) {
-      return Promise.reject(new Error("网关返回了页面内容，请检查 ngrok 配置"));
+      return Promise.reject(attachApiError(new Error("网关返回了页面内容，请检查 ngrok 配置"), {
+        status: response.status,
+        message: "网关返回了页面内容，请检查 ngrok 配置"
+      }));
     }
     //将响应体赋给 res。
     // 如果响应不是对象、为 null 或没有 code 字段，直接返回原数据。
@@ -62,8 +99,13 @@ request.interceptors.response.use(
     //如果 code 不为 0，认为请求失败
     //如果 code === 0，返回 res.data，也就是实际业务数据
     if (res.code !== 0) {
-      presentToast(res.message || "请求失败");
-      return Promise.reject(new Error(res.message || "请求失败"));
+      const error = attachApiError(new Error(), {
+        status: response.status,
+        code: res.code,
+        message: res.message
+      });
+      presentToast(error.apiMessage);
+      return Promise.reject(error);
     }
     return res.data;
   },
@@ -75,17 +117,22 @@ request.interceptors.response.use(
     if (contentType.includes("text/html")) {
       message = "请求被网关拦截，请确认 ngrok 地址和请求头配置";
     }
+    const apiError = attachApiError(error, {
+      status,
+      code: error.response?.data?.code ?? status,
+      message
+    });
     //自动登出并跳转到登录页,清除token，防止 token 过期导致的无限请求循环。
     //调用 clearAuth() 清除 token。
 // 如果当前页面不在 /login，跳转到登录页
-    if (status === 401) {
+    if (apiError.status === 401) {
       clearAuth();
       if (window.location.hash.indexOf("/login") === -1 && window.location.pathname.indexOf("/login") === -1) {
         window.location.href = "/login";
       }
     }
-    await presentToast(message);
-    return Promise.reject(error);
+    await presentToast(apiError.apiMessage);
+    return Promise.reject(apiError);
   }
 );
 

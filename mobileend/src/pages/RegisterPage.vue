@@ -22,12 +22,6 @@
         <ion-item>
           <ion-input v-model="form.phone" label="手机号" label-placement="stacked" maxlength="11" />
         </ion-item>
-        <ion-item>
-          <ion-select v-model="form.role" label="角色" label-placement="stacked">
-            <ion-select-option value="USER">普通用户</ion-select-option>
-            <ion-select-option value="EMPLOYEE">员工</ion-select-option>
-          </ion-select>
-        </ion-item>
         <ion-button expand="block" :disabled="loading" @click="submit">注册</ion-button>
       </div>
     </ion-content>
@@ -44,8 +38,6 @@ import {
   IonInput,
   IonItem,
   IonPage,
-  IonSelect,
-  IonSelectOption,
   IonTitle,
   IonToolbar
 } from "@ionic/vue";
@@ -61,8 +53,7 @@ const form = reactive({
   username: "",
   password: "",
   phone: "",
-  nickname: "",
-  role: "USER"
+  nickname: ""
 });
 
 async function submit() {

@@ -10,6 +10,7 @@ import com.community.dto.SmsLoginRequest;
 import com.community.dto.UserResponse;
 import com.community.entity.SysUser;
 import com.community.service.SysUserService;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,23 +27,23 @@ public class AuthController {
         this.userService = userService;
     }
 
-    @PostMapping("/register")
+    @PostMapping(value = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<UserResponse> register(@Validated @RequestBody RegisterRequest request) {
         SysUser user = userService.register(request);
         return ApiResponse.success(UserResponse.from(user));
     }
 
-    @PostMapping("/login")
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<LoginResponse> login(@Validated @RequestBody LoginRequest request) {
         return ApiResponse.success(userService.login(request));
     }
 
-    @PostMapping("/sms/send")
+    @PostMapping(value = "/sms/send", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<SmsCodeSendResponse> sendSmsCode(@Validated @RequestBody SmsCodeRequest request) {
         return ApiResponse.success(userService.sendSmsCode(request));
     }
 
-    @PostMapping("/sms/login")
+    @PostMapping(value = "/sms/login", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<LoginResponse> smsLogin(@Validated @RequestBody SmsLoginRequest request) {
         return ApiResponse.success(userService.smsLogin(request));
     }

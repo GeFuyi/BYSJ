@@ -191,14 +191,13 @@ public class RepairOrderServiceImpl implements RepairOrderService {
         }
         String targetStatus = normalizeStatus(request.getTargetStatus());
         String currentStatus = order.getStatus();
+        ensureStatusChangePermission(order, currentUser, targetStatus);
         if (Objects.equals(currentStatus, targetStatus)) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(409, "工单已处于目标状态");
         }
         if (!RepairOrderStatus.canTransition(currentStatus, targetStatus)) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(409, "当前工单状态不允许该变更");
         }
-
-        ensureStatusChangePermission(order, currentUser, targetStatus);
 
         Long handlerId = order.getHandlerId();
         if (RepairOrderStatus.ACCEPTED.name().equals(targetStatus)) {
@@ -355,7 +354,7 @@ public class RepairOrderServiceImpl implements RepairOrderService {
     private void ensureStatusChangePermission(RepairOrder order, SysUser currentUser, String targetStatus) {
         if (RepairOrderStatus.isEmployeeActionTarget(targetStatus)) {
             if (!isAdminOrEmployee(currentUser)) {
-                throw new BusinessException(403, "无权限访问");
+                throw new BusinessException(403, "无权变更该工单状态");
             }
             return;
         }
@@ -364,11 +363,11 @@ public class RepairOrderServiceImpl implements RepairOrderService {
                 return;
             }
             if (!order.getUserId().equals(currentUser.getId())) {
-                throw new BusinessException(403, "无权限访问");
+                throw new BusinessException(403, "无权变更该工单状态");
             }
             return;
         }
-        throw new BusinessException("操作失败");
+        throw new BusinessException(400, "不支持的状态操作");
     }
 
     private boolean isAdminOrEmployee(SysUser user) {

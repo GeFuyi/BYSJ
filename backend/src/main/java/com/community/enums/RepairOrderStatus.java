@@ -41,7 +41,7 @@ public enum RepairOrderStatus {
         try {
             return valueOf(code);
         } catch (Exception ex) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(400, "状态值不合法");
         }
     }
 

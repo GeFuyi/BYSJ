@@ -22,6 +22,7 @@ import com.community.sms.AliyunSmsCheckResult;
 import com.community.sms.AliyunSmsGateway;
 import com.community.sms.AliyunSmsSendResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,11 +69,8 @@ public class SysUserServiceImpl implements SysUserService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public SysUser register(RegisterRequest request) {
-        if (!UserRole.isValid(request.getRole())) {
-            throw new BusinessException("操作失败");
-        }
         if (userMapper.selectByUsername(request.getUsername()) != null) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(409, "用户名已存在");
         }
 
         String phone = defaultPhoneIfBlank(request.getPhone());
@@ -84,7 +82,7 @@ public class SysUserServiceImpl implements SysUserService {
         user.setPhone(phone);
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
         user.setAvatarPath(normalizeAvatarPath(request.getAvatarPath()));
-        user.setRole(request.getRole());
+        user.setRole(UserRole.USER.name());
         user.setStatus(1);
 
         userMapper.insert(user);
@@ -312,9 +310,16 @@ public class SysUserServiceImpl implements SysUserService {
     public void deleteUser(Long id) {
         SysUser existing = userMapper.selectById(id);
         if (existing == null) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(404, "资源不存在");
         }
-        userMapper.deleteById(id);
+        try {
+            int deleted = userMapper.deleteById(id);
+            if (deleted == 0) {
+                throw new BusinessException(404, "资源不存在");
+            }
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessException(409, "用户存在关联数据，不能删除，请先禁用账号或处理关联数据");
+        }
         redisTemplate.delete(userKey(id));
         evictUserListCache();
     }
@@ -402,7 +407,7 @@ public class SysUserServiceImpl implements SysUserService {
 
     private void assertPhoneValid(String phone) {
         if (!PHONE_PATTERN.matcher(phone).matches()) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(400, "手机号格式不正确");
         }
     }
 
@@ -416,10 +421,10 @@ public class SysUserServiceImpl implements SysUserService {
         }
         String normalized = avatarPath.trim();
         if (normalized.length() > MAX_AVATAR_PATH_LEN) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(400, "头像路径不合法");
         }
         if (normalized.contains("..")) {
-            throw new BusinessException("操作失败");
+            throw new BusinessException(400, "头像路径不合法");
         }
         return normalized;
     }

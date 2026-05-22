@@ -15,13 +15,6 @@
         <el-form-item label="昵称" prop="nickname">
           <el-input v-model="form.nickname" placeholder="可选" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="form.role" style="width: 100%">
-            <el-option label="管理员" value="ADMIN" />
-            <el-option label="员工" value="EMPLOYEE" />
-            <el-option label="用户" value="USER" />
-          </el-select>
-        </el-form-item>
         <el-button type="primary" :loading="loading" style="width: 100%" @click="handleRegister">注册</el-button>
       </el-form>
       <div style="margin-top: 16px; text-align: right">
@@ -44,8 +37,7 @@ const form = reactive({
   username: "",
   password: "",
   phone: "",
-  nickname: "",
-  role: "USER"
+  nickname: ""
 });
 
 const rules = {
@@ -57,8 +49,7 @@ const rules = {
     { required: true, message: "请输入密码", trigger: "blur" },
     { min: 6, max: 32, message: "密码长度需在6-32位", trigger: "blur" }
   ],
-  phone: [{ pattern: /^\d{11}$/, message: "手机号格式不正确", trigger: "blur" }],
-  role: [{ required: true, message: "请选择角色", trigger: "change" }]
+  phone: [{ pattern: /^\d{11}$/, message: "手机号格式不正确", trigger: "blur" }]
 };
 
 async function handleRegister() {

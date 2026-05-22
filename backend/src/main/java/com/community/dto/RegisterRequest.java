@@ -26,7 +26,6 @@ public class RegisterRequest {
     @Size(max = 255, message = "长度不合法")
     private String avatarPath;
 
-    @NotBlank(message = "不能为空")
-    @Pattern(regexp = "ADMIN|EMPLOYEE|USER", message = "格式不正确")
+    @Pattern(regexp = "USER", message = "公共注册仅支持普通用户")
     private String role;
 }
