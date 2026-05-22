@@ -70,6 +70,7 @@ mobileend/ios/App/DerivedData/
 # =========================
 # Runtime uploads / temp data
 # =========================
+data/
 backend/uploads/
 backend/temp/
 uploads/

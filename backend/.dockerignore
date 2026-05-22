@@ -1,0 +1,7 @@
+target/
+*.log
+*.out
+*.err
+uploads/
+temp/
+.DS_Store

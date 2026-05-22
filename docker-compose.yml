@@ -1,0 +1,108 @@
+name: bysj
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-community_app}
+      MYSQL_USER: ${MYSQL_USER:-community_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/src/main/resources/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - bysj_net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - bysj_net
+
+  backend:
+    build:
+      context: ./backend
+    image: bysj-backend:latest
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: ${JAVA_OPTS:-}
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-community_app}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-community_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_REDIS_DATABASE: 0
+      COMMUNITY_JWT_SECRET: ${COMMUNITY_JWT_SECRET:?COMMUNITY_JWT_SECRET is required}
+      ALIPAY_ENABLED: ${ALIPAY_ENABLED:-false}
+      REPAIR_UPLOAD_DIR: /app/uploads/repair
+      SERVICE_PLATFORM_UPLOAD_DIR: /app/uploads/service
+      SOCIAL_UPLOAD_DIR: /app/uploads/social
+    volumes:
+      - ./data/uploads:/app/uploads
+    ports:
+      - "127.0.0.1:${BACKEND_HTTP_PORT:-18081}:8080"
+    networks:
+      - bysj_net
+
+  frontend:
+    build:
+      context: ./frontend
+    image: bysj-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${FRONTEND_HTTP_PORT:-18080}:80"
+    networks:
+      - bysj_net
+
+  mobileend:
+    build:
+      context: ./mobileend
+      args:
+        VITE_API_BASE_URL: ${MOBILEEND_API_BASE_URL:-/api}
+        VITE_WS_BASE_URL: ${MOBILEEND_WS_BASE_URL:-}
+    image: bysj-mobileend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${MOBILEEND_HTTP_PORT:-18082}:80"
+    networks:
+      - bysj_net
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  bysj_net:
+    driver: bridge

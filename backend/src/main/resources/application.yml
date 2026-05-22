@@ -10,14 +10,14 @@ spring:
       max-request-size: 20MB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/community_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: ${COMMUNITY_DB_PASSWORD:123456}
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://127.0.0.1:3306/community_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:${COMMUNITY_DB_PASSWORD:123456}}
   redis:
-    host: 127.0.0.1
-    port: 6379
-    database: 0
-    timeout: 3000
+    host: ${SPRING_REDIS_HOST:127.0.0.1}
+    port: ${SPRING_REDIS_PORT:6379}
+    database: ${SPRING_REDIS_DATABASE:0}
+    timeout: ${SPRING_REDIS_TIMEOUT:3000}
   jackson:
     time-zone: GMT+8
     date-format: yyyy-MM-dd HH:mm:ss
@@ -53,15 +53,15 @@ sms:
   case-auth-policy: 1
 
 repair:
-  upload-dir: uploads/repair
+  upload-dir: ${REPAIR_UPLOAD_DIR:uploads/repair}
   max-file-size-mb: 10
 
 service-platform:
-  upload-dir: uploads/service
+  upload-dir: ${SERVICE_PLATFORM_UPLOAD_DIR:uploads/service}
   max-file-size-mb: 10
 
 social:
-  upload-dir: uploads/social
+  upload-dir: ${SOCIAL_UPLOAD_DIR:uploads/social}
   max-file-size-mb: 10
 
 alipay:
