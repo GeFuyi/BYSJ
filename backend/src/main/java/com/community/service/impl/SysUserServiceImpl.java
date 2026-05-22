@@ -98,7 +98,7 @@ public class SysUserServiceImpl implements SysUserService {
     public LoginResponse login(LoginRequest request) {
         SysUser user = userMapper.selectByUsername(request.getUsername());
         if (user == null || !PasswordUtil.matches(request.getPassword(), user.getPassword())) {
-            throw new BusinessException(401, "请先登录");
+            throw new BusinessException(401, "账号或密码错误");
         }
         if (user.getStatus() == null || user.getStatus() != 1) {
             throw new BusinessException(403, "无权限访问");
