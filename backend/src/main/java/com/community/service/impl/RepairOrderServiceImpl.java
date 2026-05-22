@@ -26,10 +26,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriUtils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -110,7 +110,7 @@ public class RepairOrderServiceImpl implements RepairOrderService {
         RepairImageUploadResponse response = new RepairImageUploadResponse();
         response.setPath(relativePath);
         response.setOriginalName(file.getOriginalFilename());
-        response.setUrl("/api/repair/file?path=" + URLEncoder.encode(relativePath, StandardCharsets.UTF_8));
+        response.setUrl("/api/repair/file?path=" + UriUtils.encodeQueryParam(relativePath, StandardCharsets.UTF_8));
         return response;
     }
 
