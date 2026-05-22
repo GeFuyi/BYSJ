@@ -253,7 +253,7 @@ VITE_WS_BASE_URL=ws://10.0.2.2:8080
 
 ### 8.1 环境准备
 
-- JDK 8+
+- JDK 17+
 - Maven 3.8+
 - MySQL 8.x
 - Redis 6.x / 7.x

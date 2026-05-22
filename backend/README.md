@@ -16,7 +16,7 @@
 ## 2. 技术栈
 
 - Spring Boot 2.7.18
-- Java 8
+- Java 17
 - MyBatis + XML Mapper
 - MySQL 8.x
 - Redis 6.x / 7.x
@@ -379,7 +379,7 @@ backend
 
 ### 9.1 环境要求
 
-- JDK 8+
+- JDK 17+
 - Maven 3.8+
 - MySQL 8.x
 - Redis 6.x / 7.x
